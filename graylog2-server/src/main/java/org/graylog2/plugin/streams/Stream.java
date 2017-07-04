@@ -84,4 +84,6 @@ public interface Stream extends Persisted {
     String getIndexSetId();
 
     void setIndexSetId(String indexSetId);
+    void setFavoriteStream(Boolean favoriteStream );
+    Boolean isFavoriteStream();
 }

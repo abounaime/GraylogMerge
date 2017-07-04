@@ -19,15 +19,12 @@ package org.graylog2.indexer.searches;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedSet;
 import com.lordofthejars.nosqlunit.annotation.UsingDataSet;
 import com.lordofthejars.nosqlunit.core.LoadStrategyEnum;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.graylog2.AbstractESTest;
 import org.graylog2.Configuration;
-import org.graylog2.buffers.processors.fakestreams.FakeStream;
 import org.graylog2.indexer.IndexHelper;
 import org.graylog2.indexer.IndexSet;
 import org.graylog2.indexer.TestIndexSet;
@@ -41,9 +38,6 @@ import org.graylog2.indexer.ranges.MongoIndexRange;
 import org.graylog2.indexer.results.CountResult;
 import org.graylog2.indexer.results.FieldStatsResult;
 import org.graylog2.indexer.results.HistogramResult;
-import org.graylog2.indexer.results.ResultMessage;
-import org.graylog2.indexer.results.ScrollResult;
-import org.graylog2.indexer.results.SearchResult;
 import org.graylog2.indexer.results.TermsResult;
 import org.graylog2.indexer.results.TermsStatsResult;
 import org.graylog2.indexer.retention.strategies.DeletionRetentionStrategy;
@@ -66,13 +60,13 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 
+import static com.lordofthejars.nosqlunit.elasticsearch2.ElasticsearchRule.ElasticsearchRuleBuilder.newElasticsearchRule;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.joda.time.DateTimeZone.UTC;
 import static org.mockito.ArgumentMatchers.any;
@@ -89,7 +83,6 @@ public class SearchesTest extends AbstractESTest {
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 
     private static final String INDEX_NAME = "graylog_0";
-    private static final String STREAM_ID = "000000000000000000000001";
     private static final SortedSet<IndexRange> INDEX_RANGES = ImmutableSortedSet
             .orderedBy(new IndexRangeComparator())
             .add(new IndexRange() {
@@ -115,7 +108,7 @@ public class SearchesTest extends AbstractESTest {
 
                 @Override
                 public List<String> streamIds() {
-                    return Collections.singletonList(STREAM_ID);
+                    return null;
                 }
 
                 @Override
@@ -132,9 +125,6 @@ public class SearchesTest extends AbstractESTest {
 
     @Mock
     private StreamService streamService;
-
-    @Mock
-    private Indices indices;
 
     private MetricRegistry metricRegistry;
     private Searches searches;
@@ -163,74 +153,19 @@ public class SearchesTest extends AbstractESTest {
 
     @Before
     public void setUp() throws Exception {
-        super.setUp();
         when(indexRangeService.find(any(DateTime.class), any(DateTime.class))).thenReturn(INDEX_RANGES);
-        when(indices.getAllMessageFieldsForIndices(any(String[].class))).thenReturn(ImmutableMap.of(INDEX_NAME, Collections.singleton("n")));
         metricRegistry = new MetricRegistry();
-        searches = new Searches(
-            new Configuration(),
-            indexRangeService,
-            metricRegistry,
-            streamService,
-            indices,
-            jestClient(),
-            (initialResult, query, fields) -> new ScrollResult(jestClient(), new ObjectMapper(), initialResult, query, fields)
-        );
+        searches = new Searches(new Configuration(), indexRangeService, client, metricRegistry, streamService, mock(Indices.class));
     }
 
     @Test
     @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
-    public void testCountWithoutFilter() throws Exception {
+    public void testCount() throws Exception {
         CountResult result = searches.count("*", AbsoluteRange.create(
                 new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC),
                 new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC)));
 
         assertThat(result.count()).isEqualTo(10L);
-    }
-
-    @Test
-    @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
-    public void testCountWithFilter() throws Exception {
-        final IndexSetConfig indexSetConfig = IndexSetConfig.builder()
-                .id("id")
-                .title("title")
-                .indexPrefix("prefix")
-                .shards(1)
-                .replicas(0)
-                .rotationStrategy(MessageCountRotationStrategyConfig.createDefault())
-                .retentionStrategyClass(DeletionRetentionStrategy.class.getCanonicalName())
-                .retentionStrategy(DeletionRetentionStrategyConfig.createDefault())
-                .creationDate(ZonedDateTime.of(2017, 5, 24, 0, 0, 0, 0, ZoneOffset.UTC))
-                .indexAnalyzer("standard")
-                .indexTemplateName("template")
-                .indexOptimizationMaxNumSegments(1)
-                .indexOptimizationDisabled(false)
-                .build();
-        final IndexSet indexSet = new TestIndexSet(indexSetConfig);
-        final Stream stream = new FakeStream("test") {
-            @Override
-            public IndexSet getIndexSet() {
-                return indexSet;
-            }
-        };
-        when(streamService.load(STREAM_ID)).thenReturn(stream);
-        CountResult result = searches.count("*", AbsoluteRange.create(
-                new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC),
-                new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC)),
-                "streams:" + STREAM_ID);
-
-        assertThat(result.count()).isEqualTo(5L);
-    }
-
-    @Test
-    @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
-    public void testCountWithInvalidFilter() throws Exception {
-        CountResult result = searches.count("*", AbsoluteRange.create(
-                new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC),
-                new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC)),
-                "foobar-not-a-filter");
-
-        assertThat(result.count()).isEqualTo(0L);
     }
 
     @Test
@@ -492,57 +427,6 @@ public class SearchesTest extends AbstractESTest {
 
     @Test
     @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
-    @SuppressWarnings("unchecked")
-    public void testFieldHistogramWithMonth() throws Exception {
-        final AbsoluteRange range = AbsoluteRange.create(new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC).withZone(UTC), new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC).withZone(UTC));
-        HistogramResult h = searches.fieldHistogram("*", "n", Searches.DateHistogramInterval.MONTH, null, range, false);
-
-        assertThat(h.getInterval()).isEqualTo(Searches.DateHistogramInterval.MONTH);
-        assertThat(h.getHistogramBoundaries()).isEqualTo(range);
-        assertThat(h.getResults()).hasSize(1);
-        assertThat((Map<String, Number>) h.getResults().get(new DateTime(2015, 1, 1, 0, 0, UTC).getMillis() / 1000L))
-                .containsEntry("total_count", 10L)
-                .containsEntry("total", 19.0)
-                .containsEntry("min", 1.0)
-                .containsEntry("max", 4.0);
-    }
-
-    @Test
-    @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
-    @SuppressWarnings("unchecked")
-    public void testFieldHistogramWithQuarter() throws Exception {
-        final AbsoluteRange range = AbsoluteRange.create(new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC).withZone(UTC), new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC).withZone(UTC));
-        HistogramResult h = searches.fieldHistogram("*", "n", Searches.DateHistogramInterval.QUARTER, null, range, false);
-
-        assertThat(h.getInterval()).isEqualTo(Searches.DateHistogramInterval.QUARTER);
-        assertThat(h.getHistogramBoundaries()).isEqualTo(range);
-        assertThat(h.getResults()).hasSize(1);
-        assertThat((Map<String, Number>) h.getResults().get(new DateTime(2015, 1, 1, 0, 0, UTC).getMillis() / 1000L))
-                .containsEntry("total_count", 10L)
-                .containsEntry("total", 19.0)
-                .containsEntry("min", 1.0)
-                .containsEntry("max", 4.0);
-    }
-
-    @Test
-    @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
-    @SuppressWarnings("unchecked")
-    public void testFieldHistogramWithYear() throws Exception {
-        final AbsoluteRange range = AbsoluteRange.create(new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC).withZone(UTC), new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC).withZone(UTC));
-        HistogramResult h = searches.fieldHistogram("*", "n", Searches.DateHistogramInterval.YEAR, null, range, false);
-
-        assertThat(h.getInterval()).isEqualTo(Searches.DateHistogramInterval.YEAR);
-        assertThat(h.getHistogramBoundaries()).isEqualTo(range);
-        assertThat(h.getResults()).hasSize(1);
-        assertThat((Map<String, Number>) h.getResults().get(new DateTime(2015, 1, 1, 0, 0, UTC).getMillis() / 1000L))
-                .containsEntry("total_count", 10L)
-                .containsEntry("total", 19.0)
-                .containsEntry("min", 1.0)
-                .containsEntry("max", 4.0);
-    }
-
-    @Test
-    @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
     public void fieldHistogramRecordsMetrics() throws Exception {
         final AbsoluteRange range = AbsoluteRange.create(new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC), new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC));
         HistogramResult h = searches.fieldHistogram("*", "n", Searches.DateHistogramInterval.MINUTE, null, range, false);
@@ -702,41 +586,5 @@ public class SearchesTest extends AbstractESTest {
 
         assertThat(searches.determineAffectedIndices(absoluteRange, "streams:123456789ABCDEF"))
                 .containsOnly(b0.indexName(), b1.indexName());
-    }
-
-    @Test
-    @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
-    public void searchDoesNotIncludeJestMetadata() throws Exception {
-        final AbsoluteRange range = AbsoluteRange.create(new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC).withZone(UTC), new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC).withZone(UTC));
-        final SearchResult searchResult = searches.search("_id:1", range, 0, 0, Sorting.DEFAULT);
-
-        assertThat(searchResult).isNotNull();
-        assertThat(searchResult.getTotalResults()).isEqualTo(1L);
-        assertThat(searchResult.getFields()).doesNotContain("es_metadata_id", "es_metadata_version");
-    }
-
-    @Test
-    @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
-    public void fieldStatsDoesNotIncludeJestMetadata() throws Exception {
-        final AbsoluteRange range = AbsoluteRange.create(new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC).withZone(UTC), new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC).withZone(UTC));
-        final FieldStatsResult fieldStatsResult = searches.fieldStats("n", "_id:1", range);
-
-        assertThat(fieldStatsResult).isNotNull();
-        assertThat(fieldStatsResult.getSearchHits()).isNotNull();
-        assertThat(fieldStatsResult.getSearchHits()).hasSize(1);
-        final ResultMessage resultMessage = fieldStatsResult.getSearchHits().get(0);
-        assertThat(resultMessage.getMessage().getFields()).doesNotContainKeys("es_metadata_id", "es_metadata_version");
-    }
-
-    @Test
-    @UsingDataSet(loadStrategy = LoadStrategyEnum.CLEAN_INSERT)
-    public void searchReturnsCorrectTotalHits() throws Exception {
-        final AbsoluteRange range = AbsoluteRange.create(new DateTime(2015, 1, 1, 0, 0, DateTimeZone.UTC).withZone(UTC), new DateTime(2015, 1, 2, 0, 0, DateTimeZone.UTC).withZone(UTC));
-        final SearchResult searchResult = searches.search("*", range, 5, 0, Sorting.DEFAULT);
-
-        assertThat(searchResult).isNotNull();
-        assertThat(searchResult.getResults()).hasSize(5);
-        assertThat(searchResult.getTotalResults()).isEqualTo(10L);
-        assertThat(searchResult.getFields()).doesNotContain("es_metadata_id", "es_metadata_version");
     }
 }

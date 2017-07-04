@@ -169,6 +169,8 @@ const ApiRoutes = {
     get: (streamId) => { return { url: `/streams/${streamId}` }; },
     create: () => { return { url: '/streams' }; },
     update: (streamId) => { return { url: `/streams/${streamId}` }; },
+    modif: (streamId) => { return { url: `/streams/nofav/${streamId}` }; },
+    addToFav : (streamId) => { return { url: `/streams/addfav/${streamId}` }; },
     cloneStream: (streamId) => { return { url: `/streams/${streamId}/clone` }; },
     delete: (streamId) => { return { url: `/streams/${streamId}` }; },
     pause: (streamId) => { return { url: `/streams/${streamId}/pause` }; },
@@ -184,12 +186,13 @@ const ApiRoutes = {
     delete: (streamId, streamRuleId) => { return { url: `/streams/${streamId}/rules/${streamRuleId}` }; },
     update: (streamId, streamRuleId) => { return { url: `/streams/${streamId}/rules/${streamRuleId}` }; },
     create: (streamId) => { return { url: `/streams/${streamId}/rules` }; },
+    list: (streamId) => { return { url: `/streams/${streamId}/rules` }; },
+
   },
   SystemApiController: {
     info: () => { return { url: '/system' }; },
     jvm: () => { return { url: '/system/jvm' }; },
     fields: () => { return { url: '/system/fields' }; },
-    locales: () => { return { url: '/system/locales' }; },
   },
   SystemJobsApiController: {
     list: () => { return { url: '/cluster/jobs' }; },
@@ -208,7 +211,6 @@ const ApiRoutes = {
     splitAndIndexTest: () => { return { url: '/tools/split_and_index_tester' }; },
     substringTest: () => { return { url: '/tools/substring_tester' }; },
     containsStringTest: () => { return { url: '/tools/contains_string_tester' }; },
-    lookupTableTest: () => { return { url: '/tools/lookup_table_tester' }; },
   },
   UniversalSearchApiController: {
     _streamFilter(streamId) {

@@ -26,6 +26,7 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import org.apache.shiro.authz.annotation.RequiresAuthentication;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.elasticsearch.index.IndexNotFoundException;
 import org.graylog2.audit.jersey.NoAuditEvent;
 import org.graylog2.indexer.IndexSetRegistry;
 import org.graylog2.indexer.messages.DocumentNotFoundException;
@@ -59,7 +60,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
@@ -95,7 +95,7 @@ public class MessageResource extends RestResource {
     public ResultMessage search(@ApiParam(name = "index", value = "The index this message is stored in.", required = true)
                                 @PathParam("index") String index,
                                 @ApiParam(name = "messageId", required = true)
-                                @PathParam("messageId") String messageId) throws IOException {
+                                @PathParam("messageId") String messageId) {
         checkPermission(RestPermissions.MESSAGES_READ, messageId);
         try {
             final ResultMessage resultMessage = messages.get(messageId, index);
@@ -103,6 +103,10 @@ public class MessageResource extends RestResource {
             checkMessageReadPermission(message);
 
             return resultMessage;
+        } catch (IndexNotFoundException e) {
+            final String msg = "Index " + e.getIndex() + " does not exist.";
+            LOG.error(msg, e);
+            throw new NotFoundException(msg, e);
         } catch (DocumentNotFoundException e) {
             final String msg = "Message " + messageId + " does not exist in index " + index;
             LOG.error(msg, e);
@@ -198,13 +202,19 @@ public class MessageResource extends RestResource {
             @ApiParam(name = "analyzer", value = "The analyzer to use.")
             @QueryParam("analyzer") @Nullable String analyzer,
             @ApiParam(name = "string", value = "The string to analyze.", required = true)
-            @QueryParam("string") @NotEmpty String string) throws IOException {
+            @QueryParam("string") @NotEmpty String string) {
 
         final String indexAnalyzer = indexSetRegistry.getForIndex(index)
                 .map(indexSet -> indexSet.getConfig().indexAnalyzer())
                 .orElse("standard");
         final String messageAnalyzer = analyzer == null ? indexAnalyzer : analyzer;
 
-        return MessageTokens.create(messages.analyze(string, index, messageAnalyzer));
+        try {
+            return MessageTokens.create(messages.analyze(string, index, messageAnalyzer));
+        } catch (IndexNotFoundException e) {
+            final String message = "Index " + index + " does not exist.";
+            LOG.error(message, e);
+            throw new NotFoundException(message);
+        }
     }
 }

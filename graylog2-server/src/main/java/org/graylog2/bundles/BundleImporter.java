@@ -16,11 +16,9 @@
  */
 package org.graylog2.bundles;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import org.bson.types.ObjectId;
 import org.graylog2.dashboards.DashboardImpl;
 import org.graylog2.dashboards.DashboardService;
@@ -35,14 +33,6 @@ import org.graylog2.indexer.IndexSetRegistry;
 import org.graylog2.inputs.InputService;
 import org.graylog2.inputs.converters.ConverterFactory;
 import org.graylog2.inputs.extractors.ExtractorFactory;
-import org.graylog2.lookup.db.DBCacheService;
-import org.graylog2.lookup.db.DBDataAdapterService;
-import org.graylog2.lookup.db.DBLookupTableService;
-import org.graylog2.lookup.dto.CacheDto;
-import org.graylog2.lookup.dto.DataAdapterDto;
-import org.graylog2.lookup.dto.LookupTableDto;
-import org.graylog2.lookup.events.LookupTablesDeleted;
-import org.graylog2.lookup.events.LookupTablesUpdated;
 import org.graylog2.plugin.Message;
 import org.graylog2.plugin.ServerStatus;
 import org.graylog2.plugin.Tools;
@@ -52,8 +42,6 @@ import org.graylog2.plugin.database.ValidationException;
 import org.graylog2.plugin.indexer.searches.timeranges.InvalidRangeParametersException;
 import org.graylog2.plugin.indexer.searches.timeranges.TimeRange;
 import org.graylog2.plugin.inputs.MessageInput;
-import org.graylog2.plugin.lookup.LookupCacheConfiguration;
-import org.graylog2.plugin.lookup.LookupDataAdapterConfiguration;
 import org.graylog2.rest.models.dashboards.requests.WidgetPositionsRequest;
 import org.graylog2.shared.inputs.InputLauncher;
 import org.graylog2.shared.inputs.InputRegistry;
@@ -65,7 +53,6 @@ import org.graylog2.streams.StreamImpl;
 import org.graylog2.streams.StreamRuleImpl;
 import org.graylog2.streams.StreamRuleService;
 import org.graylog2.streams.StreamService;
-import org.graylog2.streams.events.StreamsChangedEvent;
 import org.graylog2.timeranges.TimeRangeFactory;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -76,7 +63,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -90,7 +76,6 @@ public class BundleImporter {
     private final InputService inputService;
     private final InputRegistry inputRegistry;
     private final ExtractorFactory extractorFactory;
-    private final ConverterFactory converterFactory;
     private final StreamService streamService;
     private final StreamRuleService streamRuleService;
     private final IndexSetRegistry indexSetRegistry;
@@ -101,21 +86,14 @@ public class BundleImporter {
     private final MessageInputFactory messageInputFactory;
     private final InputLauncher inputLauncher;
     private final GrokPatternService grokPatternService;
-    private final DBLookupTableService dbLookupTableService;
-    private final DBCacheService dbCacheService;
-    private final DBDataAdapterService dbDataAdapterService;
     private final TimeRangeFactory timeRangeFactory;
     private final ClusterEventBus clusterBus;
-    private final ObjectMapper objectMapper;
 
     private final Map<String, org.graylog2.grok.GrokPattern> createdGrokPatterns = new HashMap<>();
     private final Map<String, MessageInput> createdInputs = new HashMap<>();
     private final Map<String, org.graylog2.plugin.streams.Output> createdOutputs = new HashMap<>();
     private final Map<String, org.graylog2.plugin.streams.Stream> createdStreams = new HashMap<>();
     private final Map<String, org.graylog2.dashboards.Dashboard> createdDashboards = new HashMap<>();
-    private final Map<String, LookupTableDto> createdLookupTables= new HashMap<>();
-    private final Map<String, CacheDto> createdLookupCaches = new HashMap<>();
-    private final Map<String, DataAdapterDto> createdLookupDataAdapters = new HashMap<>();
     private final Map<String, org.graylog2.plugin.streams.Output> outputsByReferenceId = new HashMap<>();
     private final Map<String, org.graylog2.plugin.streams.Stream> streamsByReferenceId = new HashMap<>();
 
@@ -123,7 +101,6 @@ public class BundleImporter {
     public BundleImporter(final InputService inputService,
                           final InputRegistry inputRegistry,
                           final ExtractorFactory extractorFactory,
-                          final ConverterFactory converterFactory,
                           final StreamService streamService,
                           final StreamRuleService streamRuleService,
                           final IndexSetRegistry indexSetRegistry,
@@ -134,16 +111,11 @@ public class BundleImporter {
                           final MessageInputFactory messageInputFactory,
                           final InputLauncher inputLauncher,
                           final GrokPatternService grokPatternService,
-                          final DBLookupTableService dbLookupTableService,
-                          final DBCacheService dbCacheService,
-                          final DBDataAdapterService dbDataAdapterService,
                           final TimeRangeFactory timeRangeFactory,
-                          final ClusterEventBus clusterBus,
-                          final ObjectMapper objectMapper) {
+                          final ClusterEventBus clusterBus) {
         this.inputService = inputService;
         this.inputRegistry = inputRegistry;
         this.extractorFactory = extractorFactory;
-        this.converterFactory = converterFactory;
         this.streamService = streamService;
         this.streamRuleService = streamRuleService;
         this.indexSetRegistry = indexSetRegistry;
@@ -154,12 +126,8 @@ public class BundleImporter {
         this.messageInputFactory = messageInputFactory;
         this.inputLauncher = inputLauncher;
         this.grokPatternService = grokPatternService;
-        this.dbLookupTableService = dbLookupTableService;
-        this.dbCacheService = dbCacheService;
-        this.dbDataAdapterService = dbDataAdapterService;
         this.timeRangeFactory = timeRangeFactory;
         this.clusterBus = clusterBus;
-        this.objectMapper = objectMapper;
     }
 
     public void runImport(final ConfigurationBundle bundle, final String userName) {
@@ -171,10 +139,6 @@ public class BundleImporter {
             createOutputs(bundleId, bundle.getOutputs(), userName);
             createStreams(bundleId, bundle.getStreams(), userName);
             createDashboards(bundleId, bundle.getDashboards(), userName);
-            createLookupCaches(bundleId, bundle.getLookupCaches());
-            createLookupDataAdapters(bundleId, bundle.getLookupDataAdapters());
-            // Lookup tables should be created last because they need caches and adapters
-            createLookupTables(bundleId, bundle.getLookupTables());
         } catch (Exception e) {
             LOG.error("Error while creating entities in content pack. Starting rollback.", e);
             if (!rollback()) {
@@ -221,27 +185,6 @@ public class BundleImporter {
             success = false;
         }
 
-        try {
-            deleteCreatedLookupTables();
-        } catch (Exception e) {
-            LOG.error("Error while removing lookup tables during rollback.", e);
-            success = false;
-        }
-
-        try {
-            deleteCreatedLookupCaches();
-        } catch (Exception e) {
-            LOG.error("Error while removing lookup caches during rollback.", e);
-            success = false;
-        }
-
-        try {
-            deleteCreatedLookupDataAdapters();
-        } catch (Exception e) {
-            LOG.error("Error while removing lookup data adapters during rollback.", e);
-            success = false;
-        }
-
         return success;
     }
 
@@ -279,10 +222,8 @@ public class BundleImporter {
 
     private void deleteCreatedStreams() throws NotFoundException {
         for (Map.Entry<String, org.graylog2.plugin.streams.Stream> entry : createdStreams.entrySet()) {
-            final String streamId = entry.getKey();
-            LOG.debug("Deleting stream {} from database", streamId);
+            LOG.debug("Deleting stream {} from database", entry.getKey());
             streamService.destroy(entry.getValue());
-            clusterBus.post(streamId);
         }
     }
 
@@ -292,29 +233,6 @@ public class BundleImporter {
 
             LOG.debug("Deleting dashboard {} from database", dashboardId);
             dashboardService.destroy(entry.getValue());
-        }
-    }
-
-    private void deleteCreatedLookupTables() {
-        for (String id : createdLookupTables.keySet()) {
-            LOG.debug("Deleting lookup table {} from database", id);
-            dbLookupTableService.delete(id);
-        }
-
-        clusterBus.post(LookupTablesDeleted.create(createdLookupTables.values()));
-    }
-
-    private void deleteCreatedLookupCaches() {
-        for (String id : createdLookupCaches.keySet()) {
-            LOG.debug("Deleting lookup cache {} from database", id);
-            dbCacheService.delete(id);
-        }
-    }
-
-    private void deleteCreatedLookupDataAdapters() {
-        for (String id : createdLookupDataAdapters.keySet()) {
-            LOG.debug("Deleting lookup data adapter {} from database", id);
-            dbDataAdapterService.delete(id);
         }
     }
 
@@ -439,7 +357,7 @@ public class BundleImporter {
 
         for (final Converter converter : requestedConverters) {
             try {
-                converters.add(converterFactory.create(converter.getType(), converter.getConfiguration()));
+                converters.add(ConverterFactory.factory(converter.getType(), converter.getConfiguration()));
             } catch (ConverterFactory.NoSuchConverterException e) {
                 LOG.warn("No such converter [" + converter.getType() + "]. Skipping.", e);
             } catch (org.graylog2.ConfigurationException e) {
@@ -544,9 +462,6 @@ public class BundleImporter {
                 streamsByReferenceId.put(referenceId, stream);
             }
         }
-
-        final ImmutableSet<String> streamIds = ImmutableSet.copyOf(createdStreams.keySet());
-        clusterBus.post(StreamsChangedEvent.create(streamIds));
     }
 
     private org.graylog2.plugin.streams.Stream createStream(final String bundleId, final Stream streamDescription, final String userName)
@@ -668,59 +583,5 @@ public class BundleImporter {
         return dashboardWidgetCreator.buildDashboardWidget(type,
                 widgetId, dashboardWidget.getDescription(), dashboardWidget.getCacheTime(),
                 config, timeRange, userName);
-    }
-
-    private void createLookupTables(String bundleId, Set<LookupTableBundle> lookupTables) {
-        for (LookupTableBundle bundle : lookupTables) {
-            final Optional<CacheDto> cacheDto = dbCacheService.get(bundle.getCacheName());
-            final Optional<DataAdapterDto> adapterDto = dbDataAdapterService.get(bundle.getDataAdapterName());
-
-            if (!cacheDto.isPresent() || !adapterDto.isPresent()) {
-                LOG.warn("Skipping content pack import of lookup table <{}> ({}) due to missing cache or data adapter", bundle.getName(), bundle.getTitle());
-                continue;
-            }
-
-            final LookupTableDto dto = dbLookupTableService.save(LookupTableDto.builder()
-                    .title(bundle.getTitle())
-                    .description(bundle.getDescription())
-                    .name(bundle.getName())
-                    .cacheId(cacheDto.get().id())
-                    .dataAdapterId(adapterDto.get().id())
-                    .defaultSingleValue(bundle.getDefaultSingleValue())
-                    .defaultSingleValueType(bundle.getDefaultSingleValueType())
-                    .defaultMultiValue(bundle.getDefaultMultiValue())
-                    .defaultMultiValueType(bundle.getDefaultMultiValueType())
-                    .contentPack(bundleId)
-                    .build());
-            createdLookupTables.put(dto.id(), dto);
-        }
-
-        clusterBus.post(LookupTablesUpdated.create(createdLookupTables.values()));
-    }
-
-    private void createLookupCaches(String bundleId, Set<LookupCacheBundle> lookupCaches) {
-        for (LookupCacheBundle bundle : lookupCaches) {
-            final CacheDto dto = dbCacheService.save(CacheDto.builder()
-                    .title(bundle.getTitle())
-                    .description(bundle.getDescription())
-                    .name(bundle.getName())
-                    .contentPack(bundleId)
-                    .config(objectMapper.convertValue(bundle.getConfig(), LookupCacheConfiguration.class))
-                    .build());
-            createdLookupCaches.put(dto.id(), dto);
-        }
-    }
-
-    private void createLookupDataAdapters(String bundleId, Set<LookupDataAdapterBundle> lookupDataAdapters) {
-        for (LookupDataAdapterBundle bundle : lookupDataAdapters) {
-            final DataAdapterDto dto = dbDataAdapterService.save(DataAdapterDto.builder()
-                    .title(bundle.getTitle())
-                    .description(bundle.getDescription())
-                    .name(bundle.getName())
-                    .contentPack(bundleId)
-                    .config(objectMapper.convertValue(bundle.getConfig(), LookupDataAdapterConfiguration.class))
-                    .build());
-            createdLookupDataAdapters.put(dto.id(), dto);
-        }
     }
 }

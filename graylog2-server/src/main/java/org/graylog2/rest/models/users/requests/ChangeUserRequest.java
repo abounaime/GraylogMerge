@@ -34,9 +34,16 @@ import java.util.List;
 @WithBeanGetter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class ChangeUserRequest {
+
+    @JsonProperty
+    @Nullable
+    public abstract String username();
+
     @JsonProperty
     @Nullable
     public abstract String email();
+
+
 
     @JsonProperty
     @Nullable
@@ -63,13 +70,14 @@ public abstract class ChangeUserRequest {
     public abstract List<String> roles();
 
     @JsonCreator
-    public static ChangeUserRequest create(@JsonProperty("email") @Nullable @Email String email,
+    public static ChangeUserRequest create(@JsonProperty("username") @Nullable  String username,
+                                            @JsonProperty("email") @Nullable @Email String email,
                                            @JsonProperty("full_name") @Nullable String fullName,
                                            @JsonProperty("permissions") @Nullable List<String> permissions,
                                            @JsonProperty("timezone") @Nullable String timezone,
                                            @JsonProperty("startpage") @Nullable @Valid Startpage startpage,
                                            @JsonProperty("session_timeout_ms") @Nullable @Min(1) Long sessionTimeoutMs,
                                            @JsonProperty("roles") @Nullable List<String> roles) {
-        return new AutoValue_ChangeUserRequest(email, fullName, permissions, timezone, startpage, sessionTimeoutMs, roles);
+        return new AutoValue_ChangeUserRequest(username,email, fullName, permissions, timezone, startpage, sessionTimeoutMs, roles);
     }
 }

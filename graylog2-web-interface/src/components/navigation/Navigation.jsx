@@ -27,7 +27,6 @@ const Navigation = React.createClass({
     fullName: React.PropTypes.string.isRequired,
     permissions: React.PropTypes.arrayOf(React.PropTypes.string).isRequired,
   },
-
   mixins: [PermissionsMixin, Reflux.connect(NotificationsStore)],
 
   componentDidMount() {
@@ -73,9 +72,6 @@ const Navigation = React.createClass({
     if (this._isActive('/system/grokpatterns')) {
       return `${prefix} / Grok Patterns`;
     }
-    if (this._isActive('/system/lookuptables')) {
-      return `${prefix} / Lookup Tables`;
-    }
     if (this._isActive('/system/configurations')) {
       return `${prefix} / Configurations`;
     }
@@ -98,9 +94,7 @@ const Navigation = React.createClass({
       <LinkContainer to={Routes.STARTPAGE}>
         <a><img src={logoUrl} /></a>
       </LinkContainer>);
-
     let notificationBadge;
-
     if (this.state.total > 0) {
       notificationBadge = (
         <Nav navbar>
@@ -148,6 +142,10 @@ const Navigation = React.createClass({
         </Navbar.Header>
         <Navbar.Collapse eventKey={0}>
           <Nav navbar>
+            <LinkContainer to={Routes.HOME}>
+              <NavItem>Home</NavItem>
+            </LinkContainer>
+
             <IfPermitted permissions={['searches:absolute', 'searches:relative', 'searches:keyword']}>
               <LinkContainer to={Routes.SEARCH}>
                 <NavItem to="search">Search</NavItem>
@@ -172,6 +170,10 @@ const Navigation = React.createClass({
               </LinkContainer>
             </IfPermitted>
 
+            <LinkContainer to={Routes.USERSANDSTREAMS}>
+              <NavItem >Users</NavItem>
+            </LinkContainer>
+
             {pluginNavigations}
 
             {/*
@@ -179,60 +181,57 @@ const Navigation = React.createClass({
              * props down to them. NavDropdown is passing some props needed in MenuItems that are being blocked
              * by IfPermitted.
              */}
-            <NavDropdown title={this._systemTitle()} id="system-menu-dropdown">
-              <LinkContainer to={Routes.SYSTEM.OVERVIEW}>
-                <MenuItem>Overview</MenuItem>
-              </LinkContainer>
-              {this.isPermitted(this.props.permissions, ['clusterconfigentry:read']) &&
-              <LinkContainer to={Routes.SYSTEM.CONFIGURATIONS}>
-                <MenuItem>Configurations</MenuItem>
-              </LinkContainer>
-              }
-              <LinkContainer to={Routes.SYSTEM.NODES.LIST}>
-                <MenuItem>Nodes</MenuItem>
-              </LinkContainer>
-              {this.isPermitted(this.props.permissions, ['inputs:read']) &&
+            <IfPermitted permissions="users:create">
+              <NavDropdown title={this._systemTitle()} id="system-menu-dropdown">
+                <LinkContainer to={Routes.SYSTEM.OVERVIEW}>
+                  <MenuItem>Overview</MenuItem>
+                </LinkContainer>
+                {this.isPermitted(this.props.permissions, ['clusterconfigentry:read']) &&
+                <LinkContainer to={Routes.SYSTEM.CONFIGURATIONS}>
+                  <MenuItem>Configurations</MenuItem>
+                </LinkContainer>
+                }
+                <LinkContainer to={Routes.SYSTEM.NODES.LIST}>
+                  <MenuItem>Nodes</MenuItem>
+                </LinkContainer>
+                {this.isPermitted(this.props.permissions, ['inputs:read']) &&
                 <LinkContainer to={Routes.SYSTEM.INPUTS}>
                   <MenuItem>Inputs</MenuItem>
                 </LinkContainer>
-              }
-              {this.isPermitted(this.props.permissions, ['outputs:read']) &&
+                }
+                {this.isPermitted(this.props.permissions, ['outputs:read']) &&
                 <LinkContainer to={Routes.SYSTEM.OUTPUTS}>
                   <MenuItem>Outputs</MenuItem>
                 </LinkContainer>
-              }
-              {this.isPermitted(this.props.permissions, ['indices:read']) &&
+                }
+                {this.isPermitted(this.props.permissions, ['indices:read']) &&
                 <LinkContainer to={Routes.SYSTEM.INDICES.LIST}>
                   <MenuItem>Indices</MenuItem>
                 </LinkContainer>
-              }
-              {this.isPermitted(this.props.permissions, ['loggers:read']) &&
+                }
+                {this.isPermitted(this.props.permissions, ['loggers:read']) &&
                 <LinkContainer to={Routes.SYSTEM.LOGGING}>
                   <MenuItem>Logging</MenuItem>
                 </LinkContainer>
-              }
-              {this.isAnyPermitted(this.props.permissions, ['users:list, roles:read']) &&
-              <LinkContainer to={Routes.SYSTEM.AUTHENTICATION.OVERVIEW}>
-                <MenuItem>Authentication</MenuItem>
-              </LinkContainer>
-              }
-              {this.isPermitted(this.props.permissions, ['dashboards:create', 'inputs:create', 'streams:create']) &&
-              <LinkContainer to={Routes.SYSTEM.CONTENTPACKS.LIST}>
-                <MenuItem>Content Packs</MenuItem>
-              </LinkContainer>
-              }
-              {this.isPermitted(this.props.permissions, ['inputs:edit']) &&
-               <LinkContainer to={Routes.SYSTEM.GROKPATTERNS}>
-                 <MenuItem>Grok Patterns</MenuItem>
-               </LinkContainer>
-              }
-              {this.isPermitted(this.props.permissions, ['inputs:edit']) &&
-                <LinkContainer to={Routes.SYSTEM.LOOKUPTABLES.OVERVIEW}>
-                <MenuItem>Lookup Tables</MenuItem>
+                }
+                {this.isAnyPermitted(this.props.permissions, ['users:list, roles:read']) &&
+                <LinkContainer to={Routes.SYSTEM.AUTHENTICATION.OVERVIEW}>
+                  <MenuItem>Authentication</MenuItem>
                 </LinkContainer>
-              }
-              {pluginSystemNavigations}
-            </NavDropdown>
+                }
+                {this.isPermitted(this.props.permissions, ['dashboards:create', 'inputs:create', 'streams:create']) &&
+                <LinkContainer to={Routes.SYSTEM.CONTENTPACKS.LIST}>
+                  <MenuItem>Content Packs</MenuItem>
+                </LinkContainer>
+                }
+                {this.isPermitted(this.props.permissions, ['inputs:edit']) &&
+                <LinkContainer to={Routes.SYSTEM.GROKPATTERNS}>
+                  <MenuItem>Grok Patterns</MenuItem>
+                </LinkContainer>
+                }
+                {pluginSystemNavigations}
+              </NavDropdown>
+            </IfPermitted>
           </Nav>
 
           {notificationBadge}

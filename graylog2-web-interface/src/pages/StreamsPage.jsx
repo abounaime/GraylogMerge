@@ -18,6 +18,7 @@ const IndexSetsStore = StoreProvider.getStore('IndexSets');
 
 import ActionsProvider from 'injection/ActionsProvider';
 const IndexSetsActions = ActionsProvider.getActions('IndexSets');
+import ss from 'components/UsersAndStreams.css'
 
 const StreamsPage = React.createClass({
   mixins: [Reflux.connect(CurrentUserStore), Reflux.connect(IndexSetsStore)],
@@ -52,7 +53,9 @@ const StreamsPage = React.createClass({
             </span>
 
             <span>
-              Read more about streams in the <DocumentationLink page={DocsHelper.PAGES.STREAMS} text="documentation" />.
+              Read more about streams in the <DocumentationLink
+              className="createStreamsCss"
+              page={DocsHelper.PAGES.STREAMS} text="documentation" />.
             </span>
 
             <IfPermitted permissions="streams:create">

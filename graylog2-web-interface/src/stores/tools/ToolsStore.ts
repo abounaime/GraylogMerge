@@ -125,17 +125,6 @@ const ToolsStore = {
 
         return promise;
     },
-
-    testLookupTable(lookupTableName: string, string: string): Promise<Object> {
-        const url = ApiRoutes.ToolsApiController.lookupTableTest().url;
-        const promise = fetch('POST', URLUtils.qualifyUrl(url), { lookup_table_name: lookupTableName, string: string });
-
-        promise.catch((errorThrown) => {
-            UserNotification.error('Details: ' + errorThrown, 'Could not check if lookup table translates the string');
-        });
-
-        return promise;
-    },
 };
 
 export = ToolsStore;

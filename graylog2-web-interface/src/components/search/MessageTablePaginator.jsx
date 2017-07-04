@@ -8,10 +8,6 @@ import StoreProvider from 'injection/StoreProvider';
 const SearchStore = StoreProvider.getStore('Search');
 const UniversalSearchStore = StoreProvider.getStore('UniversalSearch');
 
-import $ from 'jquery';
-global.jQuery = $;
-require('bootstrap/js/affix');
-
 const MessageTablePaginator = React.createClass({
   propTypes: {
     resultCount: PropTypes.number.isRequired,

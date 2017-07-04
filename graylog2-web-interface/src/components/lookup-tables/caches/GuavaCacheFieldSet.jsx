@@ -9,10 +9,6 @@ const GuavaCacheFieldSet = React.createClass({
     config: PropTypes.object.isRequired,
     updateConfig: PropTypes.func.isRequired,
     handleFormEvent: PropTypes.func.isRequired,
-// eslint-disable-next-line react/no-unused-prop-types
-    validationState: PropTypes.func.isRequired,
-// eslint-disable-next-line react/no-unused-prop-types
-    validationMessage: PropTypes.func.isRequired,
   },
 
   _update(value, unit, enabled, name) {
@@ -63,6 +59,14 @@ const GuavaCacheFieldSet = React.createClass({
                      value={config.expire_after_write}
                      unit={config.expire_after_write_unit || 'SECONDS'}
                      enabled={config.expire_after_write > 0}
+                     labelClassName="col-sm-3"
+                     wrapperClassName="col-sm-9" />
+      <TimeUnitInput label="Refresh after write"
+                     help="If enabled, entries are refreshed from the data adapter after the specified time from when they were first used."
+                     update={this.updateRefresh}
+                     value={config.refresh_after_write}
+                     unit={config.refresh_after_write_unit || 'SECONDS'}
+                     enabled={config.refresh_after_write > 0}
                      labelClassName="col-sm-3"
                      wrapperClassName="col-sm-9" />
     </fieldset>);

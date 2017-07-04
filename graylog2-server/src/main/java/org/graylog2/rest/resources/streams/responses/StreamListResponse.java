@@ -38,4 +38,5 @@ public abstract class StreamListResponse {
     public static StreamListResponse create(@JsonProperty("total") long total, @JsonProperty("streams") Collection<StreamResponse> streams) {
         return new AutoValue_StreamListResponse(total, streams);
     }
+
 }

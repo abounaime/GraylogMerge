@@ -77,10 +77,6 @@ public class RestPermissions implements PluginPermissions {
     public static final String LDAP_EDIT = "ldap:edit";
     public static final String LDAPGROUPS_EDIT = "ldapgroups:edit";
     public static final String LDAPGROUPS_READ = "ldapgroups:read";
-    public static final String LOOKUP_TABLES_CREATE = "lookuptables:create";
-    public static final String LOOKUP_TABLES_DELETE = "lookuptables:delete";
-    public static final String LOOKUP_TABLES_EDIT = "lookuptables:edit";
-    public static final String LOOKUP_TABLES_READ = "lookuptables:read";
     public static final String LOGGERS_EDIT = "loggers:edit";
     public static final String LOGGERS_EDITSUBSYSTEM = "loggers:editsubsystem";
     public static final String LOGGERS_READ = "loggers:read";
@@ -118,6 +114,7 @@ public class RestPermissions implements PluginPermissions {
     public static final String STREAMS_CREATE = "streams:create";
     public static final String STREAMS_EDIT = "streams:edit";
     public static final String STREAMS_READ = "streams:read";
+    public static final String STREAMS_LIST = "streams:list";
     public static final String SYSTEM_READ = "system:read";
     public static final String SYSTEMJOBS_CREATE = "systemjobs:create";
     public static final String SYSTEMJOBS_DELETE = "systemjobs:delete";
@@ -182,10 +179,6 @@ public class RestPermissions implements PluginPermissions {
         .add(create(LDAP_EDIT, ""))
         .add(create(LDAPGROUPS_EDIT, ""))
         .add(create(LDAPGROUPS_READ, ""))
-        .add(create(LOOKUP_TABLES_CREATE, ""))
-        .add(create(LOOKUP_TABLES_DELETE, ""))
-        .add(create(LOOKUP_TABLES_EDIT, ""))
-        .add(create(LOOKUP_TABLES_READ, ""))
         .add(create(LOGGERS_EDIT, ""))
         .add(create(LOGGERS_EDITSUBSYSTEM, ""))
         .add(create(LOGGERS_READ, ""))
@@ -223,6 +216,7 @@ public class RestPermissions implements PluginPermissions {
         .add(create(STREAMS_CREATE, ""))
         .add(create(STREAMS_EDIT, ""))
         .add(create(STREAMS_READ, ""))
+        .add(create(STREAMS_LIST, ""))
         .add(create(SYSTEM_READ, ""))
         .add(create(SYSTEMJOBS_CREATE, ""))
         .add(create(SYSTEMJOBS_DELETE, ""))
@@ -258,8 +252,10 @@ public class RestPermissions implements PluginPermissions {
         SAVEDSEARCHES_CREATE,
         SAVEDSEARCHES_EDIT,
         SAVEDSEARCHES_READ,
-        SYSTEM_READ,
-        THROUGHPUT_READ
+        THROUGHPUT_READ,
+        USERS_LIST,
+        USERS_PERMISSIONSEDIT,
+        STREAMS_LIST
     ).build();
 
     protected static final Set<Permission> READER_BASE_PERMISSIONS = PERMISSIONS.stream()

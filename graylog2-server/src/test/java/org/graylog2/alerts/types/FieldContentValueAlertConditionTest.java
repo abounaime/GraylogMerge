@@ -17,13 +17,17 @@
 package org.graylog2.alerts.types;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.SearchHits;
 import org.graylog2.Configuration;
 import org.graylog2.alerts.AbstractAlertCondition;
 import org.graylog2.alerts.AlertConditionTest;
 import org.graylog2.indexer.ranges.IndexRange;
 import org.graylog2.indexer.ranges.MongoIndexRange;
-import org.graylog2.indexer.results.ResultMessage;
 import org.graylog2.indexer.results.SearchResult;
 import org.graylog2.indexer.searches.Searches;
 import org.graylog2.indexer.searches.Sorting;
@@ -39,6 +43,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,18 +68,25 @@ public class FieldContentValueAlertConditionTest extends AlertConditionTest {
 
     @Test
     public void testRunMatchingMessagesInStream() throws Exception {
-        final ResultMessage searchHit = ResultMessage.parseFromSource("some_id", "graylog_test",
-                Collections.singletonMap("message", "something is in here"));
+        final SearchHits searchHits = mock(SearchHits.class);
+
+        final SearchHit searchHit = mock(SearchHit.class);
+        final HashMap<String, Object> source = Maps.newHashMap();
+        source.put("message", "something is in here");
+
+        when(searchHit.getId()).thenReturn("some id");
+        when(searchHit.getSource()).thenReturn(source);
+        when(searchHit.getIndex()).thenReturn("graylog_test");
+        when(searchHits.iterator()).thenReturn(Iterators.singletonIterator(searchHit));
 
         final DateTime now = DateTime.now(DateTimeZone.UTC);
         final IndexRange indexRange = MongoIndexRange.create("graylog_test", now.minusDays(1), now, now, 0);
         final Set<IndexRange> indexRanges = Sets.newHashSet(indexRange);
-        final SearchResult searchResult = spy(new SearchResult(Collections.singletonList(searchHit),
-            1L,
+        final SearchResult searchResult = spy(new SearchResult(searchHits,
             indexRanges,
             "message:something",
             null,
-            100L));
+            new TimeValue(100, TimeUnit.MILLISECONDS)));
         when(searchResult.getTotalResults()).thenReturn(1L);
         when(searches.search(
             anyString(),
@@ -94,15 +106,17 @@ public class FieldContentValueAlertConditionTest extends AlertConditionTest {
 
     @Test
     public void testRunNoMatchingMessages() throws Exception {
+        final SearchHits searchHits = mock(SearchHits.class);
+        when(searchHits.iterator()).thenReturn(Collections.<SearchHit>emptyIterator());
+
         final DateTime now = DateTime.now(DateTimeZone.UTC);
         final IndexRange indexRange = MongoIndexRange.create("graylog_test", now.minusDays(1), now, now, 0);
         final Set<IndexRange> indexRanges = Sets.newHashSet(indexRange);
-        final SearchResult searchResult = spy(new SearchResult(Collections.emptyList(),
-            0L,
+        final SearchResult searchResult = spy(new SearchResult(searchHits,
             indexRanges,
             "message:something",
             null,
-            100L));
+            new TimeValue(100, TimeUnit.MILLISECONDS)));
         when(searches.search(
             anyString(),
             anyString(),

@@ -61,6 +61,8 @@ public class StreamImpl extends PersistedImpl implements Stream {
     public static final String FIELD_REMOVE_MATCHES_FROM_DEFAULT_STREAM = "remove_matches_from_default_stream";
     public static final String FIELD_INDEX_SET_ID = "index_set_id";
     public static final String EMBEDDED_ALERT_CONDITIONS = "alert_conditions";
+    public static final String FIELD_FAVORITE_STREAM = "isFavoriteStream";
+
 
     private final List<StreamRule> streamRules;
     private final Set<Output> outputs;
@@ -239,10 +241,18 @@ public class StreamImpl extends PersistedImpl implements Stream {
     public boolean isDefaultStream() {
         return (boolean) fields.getOrDefault(FIELD_DEFAULT_STREAM, false);
     }
+    @Override
+    public Boolean isFavoriteStream() {
+        return (Boolean) fields.getOrDefault(FIELD_FAVORITE_STREAM, true);
+    }
 
     @Override
     public void setDefaultStream(boolean defaultStream) {
         fields.put(FIELD_DEFAULT_STREAM, defaultStream);
+    }
+    @Override
+    public void setFavoriteStream(Boolean favoriteStream) {
+        fields.put(FIELD_FAVORITE_STREAM, favoriteStream);
     }
 
     @Override

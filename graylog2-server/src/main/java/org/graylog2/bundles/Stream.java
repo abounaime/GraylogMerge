@@ -46,7 +46,8 @@ public class Stream {
     private Set<String> outputs = Collections.emptySet();
     @JsonProperty
     private boolean defaultStream = false;
-
+    @JsonProperty
+    private Boolean favoriteStream = false;
     public String getId() {
         return id;
     }
@@ -106,6 +107,13 @@ public class Stream {
     public boolean isDefaultStream() {
         return defaultStream;
     }
+    public Boolean isFavoriteStream() {
+        return favoriteStream;
+    }
+    public void setFavoriteStream(Boolean favoriteStream) {
+        this.favoriteStream = favoriteStream;
+    }
+
 
     public void setDefaultStream(boolean defaultStream) {
         this.defaultStream = defaultStream;

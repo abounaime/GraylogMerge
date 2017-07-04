@@ -28,6 +28,7 @@ import java.util.Set;
 public interface User extends Persisted {
     boolean isReadOnly();
 
+
     String getFullName();
 
     String getName();

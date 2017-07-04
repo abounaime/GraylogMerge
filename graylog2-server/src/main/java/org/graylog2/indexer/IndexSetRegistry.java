@@ -18,8 +18,6 @@ package org.graylog2.indexer;
 
 import org.graylog2.indexer.indices.TooManyAliasesException;
 
-import java.util.Collection;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -70,14 +68,6 @@ public interface IndexSetRegistry extends Iterable<IndexSet> {
      * @return true when index is managed by any index set, false otherwise
      */
     boolean isManagedIndex(String index);
-
-    /**
-     * Checks if the given indices are managed by any index set.
-     *
-     * @param indices the index names to check
-     * @return true when index is managed by any index set, false otherwise
-     */
-    Map<String, Boolean> isManagedIndex(Collection<String> indices);
 
     /**
      * Returns the list of all index wildcards.

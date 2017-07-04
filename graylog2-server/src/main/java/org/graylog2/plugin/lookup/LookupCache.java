@@ -16,109 +16,23 @@
  */
 package org.graylog2.plugin.lookup;
 
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.Meter;
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.util.concurrent.AbstractIdleService;
-import com.google.inject.assistedinject.Assisted;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.graylog2.lookup.LookupTable;
 
 import javax.annotation.Nullable;
-import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicReference;
 
-import static org.graylog2.utilities.ObjectUtils.objectId;
+import static com.google.common.base.Preconditions.checkState;
 
-public abstract class LookupCache extends AbstractIdleService {
-    private static final Logger LOG = LoggerFactory.getLogger(LookupCache.class);
+public abstract class LookupCache {
+
     private String id;
 
-    private final String name;
+    private LookupTable lookupTable;
+
     private final LookupCacheConfiguration config;
 
-    private final Meter totalCount;
-    private final Meter hitCount;
-    private final Meter missCount;
-    private final Timer lookupTimer;
-    private final Gauge entryCount;
-
-    private AtomicReference<Throwable> error = new AtomicReference<>();
-
-    protected LookupCache(String id,
-                          String name,
-                          LookupCacheConfiguration config,
-                          MetricRegistry metricRegistry) {
-        this.id = id;
-        this.name = name;
+    protected LookupCache(LookupCacheConfiguration config) {
         this.config = config;
-
-        this.totalCount = metricRegistry.meter(MetricRegistry.name("org.graylog2.lookup.caches", id, "requests"));
-        this.hitCount = metricRegistry.meter(MetricRegistry.name("org.graylog2.lookup.caches", id, "hits"));
-        this.missCount = metricRegistry.meter(MetricRegistry.name("org.graylog2.lookup.caches", id, "misses"));
-        this.lookupTimer = metricRegistry.timer(MetricRegistry.name("org.graylog2.lookup.caches", id, "lookupTime"));
-        this.entryCount = metricRegistry.register(MetricRegistry.name("org.graylog2.lookup.caches", id, "entries"), () -> entryCount());
-    }
-
-    public void incrTotalCount() {
-        totalCount.mark();
-    }
-
-    public void incrHitCount() {
-        hitCount.mark();
-    }
-
-    public void incrMissCount() {
-        missCount.mark();
-    }
-
-    public Timer.Context lookupTimer() {
-        return lookupTimer.time();
-    }
-
-    public Gauge<Long> entryCount() {
-        // Returns -1 if the cache does not support counting entries
-        return () -> -1L;
-    }
-
-    @Override
-    protected void startUp() throws Exception {
-        // Make sure startUp() never throws an error - we handle errors internally
-        try {
-            doStart();
-        } catch (Exception e) {
-            LOG.error("Couldn't start cache <{}/{}/@{}>", name(), id(), objectId(this), e);
-            setError(e);
-        }
-    }
-
-    protected abstract void doStart() throws Exception;
-
-    @Override
-    protected void shutDown() throws Exception {
-        // Make sure shutDown() never throws an error - we handle errors internally
-        try {
-            doStop();
-        } catch (Exception e) {
-            LOG.error("Couldn't stop cache <{}/{}/@{}>", name(), id(), objectId(this), e);
-        }
-    }
-
-    protected abstract void doStop() throws Exception;
-
-    protected void clearError() {
-        error.set(null);
-    }
-
-    public Optional<Throwable> getError() {
-        return Optional.ofNullable(error.get());
-    }
-
-    protected void setError(Throwable throwable) {
-        error.set(throwable);
     }
 
     @Nullable
@@ -130,24 +44,29 @@ public abstract class LookupCache extends AbstractIdleService {
         this.id = id;
     }
 
-    public abstract LookupResult get(LookupCacheKey key, Callable<LookupResult> loader);
+    public LookupTable getLookupTable() {
+        checkState(lookupTable != null, "lookup table cannot be null");
+        return lookupTable;
+    }
 
-    public abstract LookupResult getIfPresent(LookupCacheKey key);
+    public void setLookupTable(LookupTable lookupTable) {
+        this.lookupTable = lookupTable;
+    }
+
+    public abstract LookupResult get(Object key);
+
+    public abstract void set(Object key, Object retrievedValue);
 
     public abstract void purge();
 
-    public abstract void purge(LookupCacheKey purgeKey);
+    public abstract void purge(Object key);
 
     public LookupCacheConfiguration getConfig() {
         return config;
     }
 
-    public String name() {
-        return name;
-    }
-
     public interface Factory<T extends LookupCache> {
-        T create(@Assisted("id") String id, @Assisted("name") String name, LookupCacheConfiguration configuration);
+        T create(LookupCacheConfiguration configuration);
 
         Descriptor getDescriptor();
     }

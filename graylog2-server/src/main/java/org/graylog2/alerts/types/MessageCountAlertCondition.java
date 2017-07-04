@@ -20,6 +20,7 @@ import com.google.common.collect.Lists;
 import com.google.inject.assistedinject.Assisted;
 import com.google.inject.assistedinject.AssistedInject;
 import org.graylog2.alerts.AbstractAlertCondition;
+import org.graylog2.indexer.InvalidRangeFormatException;
 import org.graylog2.indexer.results.CountResult;
 import org.graylog2.indexer.results.ResultMessage;
 import org.graylog2.indexer.results.SearchResult;
@@ -196,7 +197,7 @@ public class MessageCountAlertCondition extends AbstractAlertCondition {
                 final List<MessageSummary> summaries = Lists.newArrayList();
                 if (getBacklog() > 0) {
                     final SearchResult backlogResult = searches.search("*", filter,
-                        range, getBacklog(), 0, new Sorting(Message.FIELD_TIMESTAMP, Sorting.Direction.DESC));
+                        range, getBacklog(), 0, new Sorting("timestamp", Sorting.Direction.DESC));
                     for (ResultMessage resultMessage : backlogResult.getResults()) {
                         final Message msg = resultMessage.getMessage();
                         summaries.add(new MessageSummary(resultMessage.getIndex(), msg));
@@ -213,6 +214,10 @@ public class MessageCountAlertCondition extends AbstractAlertCondition {
         } catch (InvalidRangeParametersException e) {
             // cannot happen lol
             LOG.error("Invalid timerange.", e);
+            return null;
+        } catch (InvalidRangeFormatException e) {
+            // lol same here
+            LOG.error("Invalid timerange format.", e);
             return null;
         }
     }

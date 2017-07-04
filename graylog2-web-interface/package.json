@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "bluebird": "^3.4.0",
-    "bootstrap": "3.3.6",
+    "bootstrap": "^3.3.7",
     "c3": "^0.4.11-rc4",
     "classnames": "^2.2.0",
     "clipboard": "^1.5.5",
@@ -44,8 +44,10 @@
     "react-dnd": "^2.0.2",
     "react-dnd-html5-backend": "^2.0.0",
     "react-grid-layout": "^0.14.3",
+    "react-icons": "^2.2.5",
     "react-overlays": "^0.6.5",
     "react-select": "^0.8.2",
+    "reactstrap": "^4.6.2",
     "rickshaw": "^1.5.1",
     "sockjs-client": "1.1.x",
     "string": "^3.3.1",
@@ -57,6 +59,7 @@
     "urijs": "^1.17.0"
   },
   "devDependencies": {
+    "@types/node": "^7.0.31",
     "assets-webpack-plugin": "^3.5.1",
     "babel-core": "^6.22.1",
     "babel-loader": "^6.2.10",

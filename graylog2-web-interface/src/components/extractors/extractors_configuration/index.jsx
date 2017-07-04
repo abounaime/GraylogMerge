@@ -5,4 +5,3 @@ export { default as RegexExtractorConfiguration } from './RegexExtractorConfigur
 export { default as RegexReplaceExtractorConfiguration } from './RegexReplaceExtractorConfiguration';
 export { default as SplitAndIndexExtractorConfiguration } from './SplitAndIndexExtractorConfiguration';
 export { default as SubstringExtractorConfiguration } from './SubstringExtractorConfiguration';
-export { default as LookupTableExtractorConfiguration } from './LookupTableExtractorConfiguration';

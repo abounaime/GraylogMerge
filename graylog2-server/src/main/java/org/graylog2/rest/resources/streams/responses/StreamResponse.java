@@ -83,6 +83,9 @@ public abstract class StreamResponse {
     @JsonProperty("index_set_id")
     public abstract String indexSetId();
 
+    @JsonProperty("isFavoriteStream")
+    public abstract Boolean isFavoriteStream();
+
     @JsonCreator
     public static StreamResponse create(@JsonProperty("id") String id,
                                         @JsonProperty("creator_user_id") String creatorUserId,
@@ -98,7 +101,9 @@ public abstract class StreamResponse {
                                         @JsonProperty("content_pack") @Nullable String contentPack,
                                         @JsonProperty("is_default") @Nullable Boolean isDefault,
                                         @JsonProperty("remove_matches_from_default_stream") @Nullable Boolean removeMatchesFromDefaultStream,
-                                        @JsonProperty("index_set_id") String indexSetId) {
+                                        @JsonProperty("index_set_id") String indexSetId,
+                                        @JsonProperty("isFavoriteStream")  Boolean isFavoriteStream
+                                        ) {
         return new AutoValue_StreamResponse(
                 id,
                 creatorUserId,
@@ -114,6 +119,8 @@ public abstract class StreamResponse {
                 contentPack,
                 firstNonNull(isDefault, false),
                 firstNonNull(removeMatchesFromDefaultStream, false),
-                indexSetId);
+                indexSetId,
+            isFavoriteStream
+        );
     }
 }

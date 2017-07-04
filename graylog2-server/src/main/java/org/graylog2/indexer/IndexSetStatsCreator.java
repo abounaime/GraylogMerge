@@ -16,15 +16,13 @@
  */
 package org.graylog2.indexer;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import org.elasticsearch.action.admin.indices.stats.IndexStats;
 import org.graylog2.indexer.indices.Indices;
 import org.graylog2.rest.resources.system.indexer.responses.IndexSetStats;
 
 import javax.inject.Inject;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 public class IndexSetStatsCreator {
     private final Indices indices;
@@ -35,17 +33,17 @@ public class IndexSetStatsCreator {
     }
 
     public IndexSetStats getForIndexSet(final IndexSet indexSet) {
+        final Map<String, IndexStats> docCounts = indices.getAllDocCounts(indexSet);
         final Set<String> closedIndices = indices.getClosedIndices(indexSet);
-        final List<JsonNode> primaries = StreamSupport.stream(indices.getIndexStats(indexSet).spliterator(), false)
-                .map(json -> json.get("primaries"))
-                .collect(Collectors.toList());
-        final long documents = primaries.stream()
-                .map(json -> json.path("docs").path("count").asLong())
-                .reduce(0L, Long::sum);
-        final long size = primaries.stream()
-                .map(json -> json.path("store").path("size_in_bytes").asLong())
-                .reduce(0L, Long::sum);
+        final long documents = docCounts.values()
+                .stream()
+                .mapToLong(indexStats -> indexStats.getPrimaries().getDocs().getCount())
+                .sum();
+        final long size = docCounts.values()
+                .stream()
+                .mapToLong(indexStats -> indexStats.getPrimaries().getStore().sizeInBytes())
+                .sum();
 
-        return IndexSetStats.create(primaries.size() + closedIndices.size(), documents, size);
+        return IndexSetStats.create(docCounts.size() + closedIndices.size(), documents, size);
     }
 }

@@ -22,5 +22,3 @@ export { default as DataAdapterForm } from './DataAdapterForm';
 export { default as DataAdapterCreate } from './DataAdapterCreate';
 export { default as DataAdapterPicker } from './DataAdapterPicker';
 export { default as DataAdaptersContainer } from './DataAdaptersContainer';
-
-export { default as ErrorPopover } from './ErrorPopover';

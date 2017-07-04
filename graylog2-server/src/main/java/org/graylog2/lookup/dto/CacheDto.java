@@ -34,29 +34,20 @@ import javax.annotation.Nullable;
 @JsonDeserialize(builder = AutoValue_CacheDto.Builder.class)
 public abstract class CacheDto {
 
-    public static final String FIELD_ID = "id";
-    public static final String FIELD_TITLE = "title";
-    public static final String FIELD_DESCRIPTION = "description";
-    public static final String FIELD_NAME = "name";
-
     @Id
     @ObjectId
     @Nullable
-    @JsonProperty(FIELD_ID)
+    @JsonProperty("id")
     public abstract String id();
 
-    @JsonProperty(FIELD_TITLE)
+    @JsonProperty("title")
     public abstract String title();
 
-    @JsonProperty(FIELD_DESCRIPTION)
+    @JsonProperty("description")
     public abstract String description();
 
-    @JsonProperty(FIELD_NAME)
+    @JsonProperty("name")
     public abstract String name();
-
-    @JsonProperty("content_pack")
-    @Nullable
-    public abstract String contentPack();
 
     @JsonProperty("config")
     public abstract LookupCacheConfiguration config();
@@ -70,20 +61,17 @@ public abstract class CacheDto {
     public abstract static class Builder {
         @Id
         @ObjectId
-        @JsonProperty(FIELD_ID)
+        @JsonProperty("id")
         public abstract Builder id(@Nullable String id);
 
-        @JsonProperty(FIELD_TITLE)
+        @JsonProperty("title")
         public abstract Builder title(String title);
 
-        @JsonProperty(FIELD_DESCRIPTION)
+        @JsonProperty("description")
         public abstract Builder description(String description);
 
-        @JsonProperty(FIELD_NAME)
+        @JsonProperty("name")
         public abstract Builder name(String name);
-
-        @JsonProperty("content_pack")
-        public abstract Builder contentPack(@Nullable String contentPack);
 
         @JsonProperty("config")
         public abstract Builder config(LookupCacheConfiguration config);

@@ -7,9 +7,7 @@ import AppWithSearchBar from 'routing/AppWithSearchBar';
 import AppWithoutSearchBar from 'routing/AppWithoutSearchBar';
 import history from 'util/History';
 import URLUtils from 'util/URLUtils';
-
 import Routes from 'routing/Routes';
-
 import StartPage from 'pages/StartPage';
 import SearchPage from 'pages/SearchPage';
 import ShowMessagePage from 'pages/ShowMessagePage';
@@ -57,9 +55,8 @@ import AuthenticationPage from 'pages/AuthenticationPage';
 import IndexSetPage from 'pages/IndexSetPage';
 import IndexSetConfigurationPage from 'pages/IndexSetConfigurationPage';
 import IndexSetCreationPage from 'pages/IndexSetCreationPage';
-import LUTTablesPage from 'pages/LUTTablesPage';
-import LUTCachesPage from 'pages/LUTCachesPage';
-import LUTDataAdaptersPage from 'pages/LUTDataAdaptersPage';
+import UsersAndStreamsPage from 'pages/UsersAndStreamsPage.jsx';
+import HomePage from 'pages/HomePage.jsx';
 
 const AppRouter = React.createClass({
   render() {
@@ -76,8 +73,11 @@ const AppRouter = React.createClass({
             <Route path={Routes.SOURCES} component={SourcesPage} />
             <Route path={Routes.stream_search(':streamId')} component={StreamSearchPage} />
             <Redirect from={Routes.legacy_stream_search(':streamId')} to={Routes.stream_search(':streamId')} />
+            <Route path={Routes.HOME} component={HomePage} />
+
           </Route>
           <Route component={AppWithoutSearchBar}>
+            <Route path={Routes.USERSANDSTREAMS} component={UsersAndStreamsPage}/>
             <Route path={Routes.GETTING_STARTED} component={GettingStartedPage} />
             <Route path={Routes.STREAMS} component={StreamsPage} />
             <Route path={Routes.stream_edit(':streamId')} component={StreamEditPage} />
@@ -108,22 +108,6 @@ const AppRouter = React.createClass({
             <Route path={Routes.SYSTEM.INDEX_SETS.SHOW(':indexSetId')} component={IndexSetPage} />
             <Route path={Routes.SYSTEM.INDEX_SETS.CONFIGURATION(':indexSetId')} component={IndexSetConfigurationPage} />
             <Route path={Routes.SYSTEM.INDICES.FAILURES} component={IndexerFailuresPage} />
-
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.OVERVIEW} component={LUTTablesPage} />
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.CREATE} component={LUTTablesPage} action="create" />
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.show(':tableName')} component={LUTTablesPage} action="show" />
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.edit(':tableName')} component={LUTTablesPage} action="edit" />
-
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.CACHES.OVERVIEW} component={LUTCachesPage} />
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.CACHES.CREATE} component={LUTCachesPage} action="create" />
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.CACHES.show(':cacheName')} component={LUTCachesPage} action="show" />
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.CACHES.edit(':cacheName')} component={LUTCachesPage} action="edit" />
-
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.DATA_ADAPTERS.OVERVIEW} component={LUTDataAdaptersPage} />
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.DATA_ADAPTERS.CREATE} component={LUTDataAdaptersPage} action="create" />
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.DATA_ADAPTERS.show(':adapterName')} component={LUTDataAdaptersPage} action="show" />
-            <Route path={Routes.SYSTEM.LOOKUPTABLES.DATA_ADAPTERS.edit(':adapterName')} component={LUTDataAdaptersPage} action="edit" />
-
             <Route path={Routes.SYSTEM.LOGGING} component={LoggersPage} />
             <Route path={Routes.SYSTEM.METRICS(':nodeId')} component={ShowMetricsPage} />
             <Route path={Routes.SYSTEM.NODES.LIST} component={NodesPage} />

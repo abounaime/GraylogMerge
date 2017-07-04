@@ -174,7 +174,11 @@ public class StreamRuleResource extends RestResource {
 
         final Stream stream = streamService.load(streamid);
         final List<StreamRule> streamRules = streamRuleService.loadForStream(stream);
+        System.out.println("streamid "+streamid+" streamRules "+streamRules.size());
+        for(int i=0;i<streamRules.size();i++){
+            System.out.println("streamRules "+streamRules);
 
+        }
         return StreamRuleListResponse.create(streamRules.size(), streamRules);
     }
 

@@ -17,24 +17,14 @@
 package org.graylog2.lookup;
 
 import com.google.auto.value.AutoValue;
-import com.google.common.collect.Streams;
 import org.graylog.autovalue.WithBeanGetter;
 import org.graylog2.plugin.lookup.LookupCache;
-import org.graylog2.plugin.lookup.LookupCacheKey;
 import org.graylog2.plugin.lookup.LookupDataAdapter;
 import org.graylog2.plugin.lookup.LookupResult;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.stream.Collectors;
 
-import static com.google.common.collect.Streams.stream;
-
-/**
- * A LookupTable references a {@link LookupCache} and a {@link LookupDataAdapter}, which both have their own lifecycle.
- * <p>
- * Multiple lookup tables can use the same caches and adapters.
- */
 @AutoValue
 @WithBeanGetter
 public abstract class LookupTable {
@@ -52,30 +42,13 @@ public abstract class LookupTable {
 
     public abstract LookupDataAdapter dataAdapter();
 
-    public abstract LookupDefaultSingleValue defaultSingleValue();
-
-    public abstract LookupDefaultMultiValue defaultMultiValue();
-
     public static Builder builder() {
         return new AutoValue_LookupTable.Builder();
     }
 
     @Nullable
-    public String error() {
-        return Streams.concat(stream(dataAdapter().getError()), stream(cache().getError()))
-                .map(Throwable::getMessage)
-                .collect(Collectors.joining("\n"));
-    }
-
-    @Nullable
     public LookupResult lookup(@Nonnull Object key) {
-        final LookupResult result = cache().get(LookupCacheKey.create(dataAdapter().id(), key), () -> dataAdapter().get(key));
-
-        // The default value will only be used if both single and multi value are empty
-        if (result.isEmpty()) {
-            return LookupResult.withDefaults(defaultSingleValue(), defaultMultiValue());
-        }
-        return result;
+        return cache().get(key);
     }
 
     @AutoValue.Builder
@@ -91,10 +64,6 @@ public abstract class LookupTable {
         public abstract Builder cache(LookupCache cache);
 
         public abstract Builder dataAdapter(LookupDataAdapter dataAdapter);
-
-        public abstract Builder defaultSingleValue(LookupDefaultSingleValue defaultSingleValue);
-
-        public abstract Builder defaultMultiValue(LookupDefaultMultiValue defaultMultiValue);
 
         public abstract LookupTable build();
     }

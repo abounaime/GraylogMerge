@@ -151,6 +151,7 @@ public class StreamResource extends RestResource {
         if (!stream.getIndexSet().getConfig().isWritable()) {
             throw new BadRequestException("Assigned index set must be writable!");
         }
+        System.out.println("isFavoriteStream"+stream.isFavoriteStream());
 
         final String id = streamService.save(stream);
 
@@ -180,6 +181,24 @@ public class StreamResource extends RestResource {
         for (Stream stream : allStreams) {
             if (isPermitted(RestPermissions.STREAMS_READ, stream.getId())) {
                 streams.add(stream);
+            }
+        }
+
+        return StreamListResponse.create(streams.size(), streams.stream().map(this::streamToResponse).collect(Collectors.toSet()));
+    }
+    // the same as the previous function !!!! but we use for a specefic page users&Streams
+    @GET
+    @Path("/list")
+    @Timed
+    @ApiOperation(value = "Get a list of all streams")
+    @Produces(MediaType.APPLICATION_JSON)
+    public StreamListResponse getForAllTheUsers() {
+        final List<Stream> allStreams = streamService.loadAll();
+        final List<Stream> streams = new ArrayList<>(allStreams.size());
+        for (Stream stream : allStreams) {
+            if (isPermitted(RestPermissions.STREAMS_LIST, stream.getId())) {
+                streams.add(stream);
+
             }
         }
 
@@ -219,6 +238,134 @@ public class StreamResource extends RestResource {
         return streamToResponse(streamService.load(streamId));
     }
 
+    @PUT
+    @Timed
+    @Path("/nofav/{streamId}")
+    @ApiOperation(value = "Update a stream")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @ApiResponses(value = {
+        @ApiResponse(code = 404, message = "Stream not found."),
+        @ApiResponse(code = 400, message = "Invalid ObjectId.")
+    })
+    @AuditEvent(type = AuditEventTypes.STREAM_UPDATE)
+    public StreamResponse updateF(@ApiParam(name = "streamId", required = true)
+                                 @PathParam("streamId") String streamId,
+                                 @ApiParam(name = "JSON body", required = true)
+                                 @Valid @NotNull UpdateStreamRequest cr) throws NotFoundException, ValidationException {
+        checkPermission(RestPermissions.STREAMS_EDIT, streamId);
+        checkNotDefaultStream(streamId, "The default stream cannot be edited.");
+
+        final Stream stream = streamService.load(streamId);
+
+        if (!Strings.isNullOrEmpty(cr.title())) {
+            stream.setTitle(cr.title());
+        }
+
+        if (!Strings.isNullOrEmpty(cr.description())) {
+            stream.setDescription(cr.description());
+        }
+
+        if (cr.matchingType() != null) {
+            try {
+                stream.setMatchingType(Stream.MatchingType.valueOf(cr.matchingType()));
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Invalid matching type '" + cr.matchingType()
+                    + "' specified. Should be one of: " + Arrays.toString(Stream.MatchingType.values()));
+            }
+        }
+
+        final Boolean removeMatchesFromDefaultStream = cr.removeMatchesFromDefaultStream();
+        if(removeMatchesFromDefaultStream != null) {
+            stream.setRemoveMatchesFromDefaultStream(removeMatchesFromDefaultStream);
+        }
+
+        // Apparently we are sending partial resources sometimes so do not overwrite the index set
+        // id if it's null/empty in the update request.
+        if (!Strings.isNullOrEmpty(cr.indexSetId())) {
+            stream.setIndexSetId(cr.indexSetId());
+        }
+
+        final Optional<IndexSet> indexSet = indexSetRegistry.get(stream.getIndexSetId());
+
+        if (!indexSet.isPresent()) {
+            throw new BadRequestException("Index set with ID <" + stream.getIndexSetId() + "> does not exist!");
+        } else if (!indexSet.get().getConfig().isWritable()) {
+            throw new BadRequestException("Assigned index set must be writable!");
+        }
+        final Boolean favoriteStream = cr.favoriteStream();
+        if(favoriteStream != null) {
+            stream.setFavoriteStream(false);
+        }
+        streamService.save(stream);
+        clusterEventBus.post(StreamsChangedEvent.create(stream.getId()));
+        System.out.println(stream.isFavoriteStream()+"88888888888888888888");
+        return streamToResponse(stream);
+    }
+
+    @PUT
+    @Timed
+    @Path("/addfav/{streamId}")
+    @ApiOperation(value = "Update a stream")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @ApiResponses(value = {
+        @ApiResponse(code = 404, message = "Stream not found."),
+        @ApiResponse(code = 400, message = "Invalid ObjectId.")
+    })
+    @AuditEvent(type = AuditEventTypes.STREAM_UPDATE)
+    public StreamResponse addToFav(@ApiParam(name = "streamId", required = true)
+                                  @PathParam("streamId") String streamId,
+                                  @ApiParam(name = "JSON body", required = true)
+                                  @Valid @NotNull UpdateStreamRequest cr) throws NotFoundException, ValidationException {
+        checkPermission(RestPermissions.STREAMS_EDIT, streamId);
+        checkNotDefaultStream(streamId, "The default stream cannot be edited.");
+
+        final Stream stream = streamService.load(streamId);
+
+        if (!Strings.isNullOrEmpty(cr.title())) {
+            stream.setTitle(cr.title());
+        }
+
+        if (!Strings.isNullOrEmpty(cr.description())) {
+            stream.setDescription(cr.description());
+        }
+
+        if (cr.matchingType() != null) {
+            try {
+                stream.setMatchingType(Stream.MatchingType.valueOf(cr.matchingType()));
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Invalid matching type '" + cr.matchingType()
+                    + "' specified. Should be one of: " + Arrays.toString(Stream.MatchingType.values()));
+            }
+        }
+
+        final Boolean removeMatchesFromDefaultStream = cr.removeMatchesFromDefaultStream();
+        if(removeMatchesFromDefaultStream != null) {
+            stream.setRemoveMatchesFromDefaultStream(removeMatchesFromDefaultStream);
+        }
+
+        // Apparently we are sending partial resources sometimes so do not overwrite the index set
+        // id if it's null/empty in the update request.
+        if (!Strings.isNullOrEmpty(cr.indexSetId())) {
+            stream.setIndexSetId(cr.indexSetId());
+        }
+
+        final Optional<IndexSet> indexSet = indexSetRegistry.get(stream.getIndexSetId());
+
+        if (!indexSet.isPresent()) {
+            throw new BadRequestException("Index set with ID <" + stream.getIndexSetId() + "> does not exist!");
+        } else if (!indexSet.get().getConfig().isWritable()) {
+            throw new BadRequestException("Assigned index set must be writable!");
+        }
+        final Boolean favoriteStream = cr.favoriteStream();
+        if(favoriteStream != null) {
+            stream.setFavoriteStream(true);
+        }
+        streamService.save(stream);
+        clusterEventBus.post(StreamsChangedEvent.create(stream.getId()));
+        return streamToResponse(stream);
+    }
     @PUT
     @Timed
     @Path("/{streamId}")
@@ -274,10 +421,12 @@ public class StreamResource extends RestResource {
         } else if (!indexSet.get().getConfig().isWritable()) {
             throw new BadRequestException("Assigned index set must be writable!");
         }
-
+        final Boolean favoriteStream = cr.favoriteStream();
+        if(favoriteStream != null) {
+            stream.setFavoriteStream(favoriteStream);
+        }
         streamService.save(stream);
         clusterEventBus.post(StreamsChangedEvent.create(stream.getId()));
-
         return streamToResponse(stream);
     }
 
@@ -493,7 +642,8 @@ public class StreamResource extends RestResource {
             stream.getContentPack(),
             stream.isDefaultStream(),
             stream.getRemoveMatchesFromDefaultStream(),
-            stream.getIndexSetId()
+            stream.getIndexSetId(),
+            stream.isFavoriteStream()
         );
     }
 
