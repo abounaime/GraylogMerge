@@ -23,16 +23,17 @@ import com.lordofthejars.nosqlunit.core.LoadStrategyEnum;
 import com.lordofthejars.nosqlunit.mongodb.InMemoryMongoDb;
 import org.assertj.jodatime.api.Assertions;
 import org.bson.types.ObjectId;
+import org.elasticsearch.ElasticsearchTimeoutException;
+import org.elasticsearch.index.IndexNotFoundException;
 import org.graylog2.audit.NullAuditEventSender;
 import org.graylog2.bindings.providers.MongoJackObjectMapperProvider;
 import org.graylog2.database.MongoConnectionRule;
 import org.graylog2.database.NotFoundException;
-import org.graylog2.indexer.ElasticsearchException;
 import org.graylog2.indexer.IndexSetRegistry;
+import org.graylog2.indexer.esplugin.IndicesClosedEvent;
+import org.graylog2.indexer.esplugin.IndicesDeletedEvent;
+import org.graylog2.indexer.esplugin.IndicesReopenedEvent;
 import org.graylog2.indexer.indices.Indices;
-import org.graylog2.indexer.indices.events.IndicesClosedEvent;
-import org.graylog2.indexer.indices.events.IndicesDeletedEvent;
-import org.graylog2.indexer.indices.events.IndicesReopenedEvent;
 import org.graylog2.indexer.searches.IndexRangeStats;
 import org.graylog2.plugin.system.NodeId;
 import org.graylog2.shared.bindings.providers.ObjectMapperProvider;
@@ -174,10 +175,10 @@ public class MongoIndexRangeServiceTest {
         Assertions.assertThat(indexRange.calculatedAt()).isEqualToIgnoringHours(DateTime.now(DateTimeZone.UTC));
     }
 
-    @Test(expected = ElasticsearchException.class)
+    @Test(expected = ElasticsearchTimeoutException.class)
     public void calculateRangeFailsIfIndexIsNotHealthy() throws Exception {
         final String index = "graylog";
-        when(indices.waitForRecovery(index)).thenThrow(new ElasticsearchException("TEST"));
+        when(indices.waitForRecovery(index)).thenThrow(new ElasticsearchTimeoutException("TEST"));
 
         indexRangeService.calculateRange(index);
     }
@@ -196,9 +197,9 @@ public class MongoIndexRangeServiceTest {
         assertThat(range.end()).isEqualTo(new DateTime(0L, DateTimeZone.UTC));
     }
 
-    @Test(expected = ElasticsearchException.class)
+    @Test(expected = IndexNotFoundException.class)
     public void testCalculateRangeWithNonExistingIndex() throws Exception {
-        when(indices.indexRangeStatsOfIndex("does-not-exist")).thenThrow(new ElasticsearchException("does-not-exist"));
+        when(indices.indexRangeStatsOfIndex("does-not-exist")).thenThrow(new IndexNotFoundException("does-not-exist"));
         indexRangeService.calculateRange("does-not-exist");
     }
 

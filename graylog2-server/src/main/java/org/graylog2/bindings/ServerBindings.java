@@ -16,11 +16,15 @@
  */
 package org.graylog2.bindings;
 
-import com.floreysoft.jmte.Engine;
 import com.google.inject.Scopes;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
 import com.google.inject.multibindings.Multibinder;
+
+import com.floreysoft.jmte.Engine;
+
 import org.apache.shiro.mgt.DefaultSecurityManager;
+import org.elasticsearch.client.Client;
+import org.elasticsearch.node.Node;
 import org.glassfish.grizzly.http.server.ErrorPageGenerator;
 import org.graylog2.Configuration;
 import org.graylog2.alerts.AlertSender;
@@ -31,6 +35,8 @@ import org.graylog2.bindings.providers.BundleImporterProvider;
 import org.graylog2.bindings.providers.ClusterEventBusProvider;
 import org.graylog2.bindings.providers.DefaultSecurityManagerProvider;
 import org.graylog2.bindings.providers.DefaultStreamProvider;
+import org.graylog2.bindings.providers.EsClientProvider;
+import org.graylog2.bindings.providers.EsNodeProvider;
 import org.graylog2.bindings.providers.MongoConnectionProvider;
 import org.graylog2.bindings.providers.RulesEngineProvider;
 import org.graylog2.bindings.providers.SystemJobFactoryProvider;
@@ -62,10 +68,8 @@ import org.graylog2.plugin.cluster.ClusterConfigService;
 import org.graylog2.plugin.inject.Graylog2Module;
 import org.graylog2.plugin.streams.DefaultStream;
 import org.graylog2.plugin.streams.Stream;
-import org.graylog2.rest.ElasticsearchExceptionMapper;
 import org.graylog2.rest.GraylogErrorPageGenerator;
 import org.graylog2.rest.NotFoundExceptionMapper;
-import org.graylog2.rest.QueryParsingExceptionMapper;
 import org.graylog2.rest.ScrollChunkWriter;
 import org.graylog2.rest.ValidationExceptionMapper;
 import org.graylog2.security.ldap.LdapConnector;
@@ -156,7 +160,8 @@ public class ServerBindings extends Graylog2Module {
         } else {
             install(new NoopJournalModule());
         }
-
+        bind(Node.class).toProvider(EsNodeProvider.class).asEagerSingleton();
+        bind(Client.class).toProvider(EsClientProvider.class).asEagerSingleton();
         bind(SystemJobManager.class).toProvider(SystemJobManagerProvider.class);
         bind(RulesEngine.class).toProvider(RulesEngineProvider.class);
         bind(LdapConnector.class).in(Scopes.SINGLETON);
@@ -201,8 +206,6 @@ public class ServerBindings extends Graylog2Module {
         final Multibinder<Class<? extends ExceptionMapper>> exceptionMappers = jerseyExceptionMapperBinder();
         exceptionMappers.addBinding().toInstance(NotFoundExceptionMapper.class);
         exceptionMappers.addBinding().toInstance(ValidationExceptionMapper.class);
-        exceptionMappers.addBinding().toInstance(ElasticsearchExceptionMapper.class);
-        exceptionMappers.addBinding().toInstance(QueryParsingExceptionMapper.class);
     }
 
     private void bindAdditionalJerseyComponents() {

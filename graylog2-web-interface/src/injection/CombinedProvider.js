@@ -43,7 +43,9 @@ class CombinedProvider {
       Streams: () => require('actions/streams/StreamsActions'),
       SystemJobs: () => require('actions/systemjobs/SystemJobsActions'),
       Widgets: () => require('actions/widgets/WidgetsActions'),
-    };
+      UsersAndStreams: () => require('actions/usersandstreams/UsersAndStreamsActions')
+
+  };
     this.stores = {
       AlarmCallbackHistory: () => require('stores/alarmcallbacks/AlarmCallbackHistoryStore'),
       AlarmCallbacks: () => require('stores/alarmcallbacks/AlarmCallbacksStore'),
@@ -118,7 +120,9 @@ class CombinedProvider {
       UsageStatsOptOut: () => require('stores/usagestats/UsageStatsOptOutStore'),
       Users: () => require('stores/users/UsersStore'),
       Widgets: () => require('stores/widgets/WidgetsStore'),
-    };
+      UsersAndStreams: () => require('stores/usersandstreams/UsersAndStreamsStore')
+
+  };
     /* eslint-enable import/no-require, global-require */
   }
 

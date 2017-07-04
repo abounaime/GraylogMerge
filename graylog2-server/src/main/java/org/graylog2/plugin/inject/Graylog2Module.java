@@ -385,10 +385,10 @@ public abstract class Graylog2Module extends AbstractModule {
     }
 
     protected void installLookupCache(String name,
-                                      Class<? extends LookupCache> cacheClass,
+                                      Class<? extends LookupCache> adapterClass,
                                       Class<? extends LookupCache.Factory> factoryClass,
                                       Class<? extends LookupCacheConfiguration> configClass) {
-        install(new FactoryModuleBuilder().implement(LookupCache.class, cacheClass).build(factoryClass));
+        install(new FactoryModuleBuilder().implement(LookupCache.class, adapterClass).build(factoryClass));
         lookupCacheBinder().addBinding(name).to(factoryClass);
         jacksonSubTypesBinder().addBinding(name).toInstance(configClass);
     }

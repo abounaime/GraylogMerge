@@ -21,9 +21,9 @@ import org.graylog2.alerts.AlertSender;
 import org.graylog2.alerts.EmailRecipients;
 import org.graylog2.configuration.EmailConfiguration;
 import org.graylog2.notifications.NotificationService;
+import org.graylog2.plugin.alarms.callbacks.AlarmCallback;
 import org.graylog2.plugin.configuration.Configuration;
 import org.graylog2.plugin.configuration.ConfigurationException;
-import org.graylog2.plugin.configuration.ConfigurationRequest;
 import org.graylog2.plugin.system.NodeId;
 import org.graylog2.shared.users.UserService;
 import org.junit.Before;
@@ -34,7 +34,6 @@ import org.junit.rules.ExpectedException;
 import java.util.Collections;
 import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -48,14 +47,13 @@ public class EmailAlarmCallbackTest {
     private EmailRecipients.Factory emailRecipientsFactory = mock(EmailRecipients.Factory.class);
     private UserService userService = mock(UserService.class);
     private EmailConfiguration emailConfiguration = mock(EmailConfiguration.class);
-    private org.graylog2.Configuration graylogConfig = mock(org.graylog2.Configuration.class);
 
-    private EmailAlarmCallback alarmCallback;
+    private AlarmCallback alarmCallback;
 
     @Before
     public void setUp() throws Exception {
         alarmCallback = new EmailAlarmCallback(alertSender, notificationService, nodeId, emailRecipientsFactory,
-                userService, emailConfiguration, graylogConfig);
+                userService, emailConfiguration);
     }
 
     @Test
@@ -121,15 +119,5 @@ public class EmailAlarmCallbackTest {
         expectedException.expectMessage("Sender or subject are missing or invalid.");
 
         alarmCallback.checkConfiguration();
-    }
-
-    @Test
-    public void getEnrichedRequestedConfigurationReturnsUsersListIncludingAdminUser() throws Exception {
-        final String userName = "admin";
-        when(graylogConfig.getRootUsername()).thenReturn(userName);
-        final ConfigurationRequest configuration = alarmCallback.getEnrichedRequestedConfiguration();
-        assertThat(configuration.containsField("user_receivers")).isTrue();
-        final Map<String, String> users = configuration.getField("user_receivers").getAdditionalInformation().get("values");
-        assertThat(users).containsEntry(userName, userName);
     }
 }

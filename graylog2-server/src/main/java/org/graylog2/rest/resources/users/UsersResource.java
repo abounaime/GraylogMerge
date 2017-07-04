@@ -232,6 +232,7 @@ public class UsersResource extends RestResource {
                            @ApiParam(name = "JSON body", value = "Updated user information.", required = true)
                            @Valid @NotNull ChangeUserRequest cr) throws ValidationException {
         checkPermission(USERS_EDIT, username);
+        System.out.println("YEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH");
 
         final User user = userService.load(username);
         if (user == null) {
@@ -242,6 +243,9 @@ public class UsersResource extends RestResource {
             throw new BadRequestException("Cannot modify readonly user " + username);
         }
         // we only allow setting a subset of the fields in CreateStreamRuleRequest
+        if(cr.username() != null){
+            user.setName(cr.username());
+        }
         if (cr.email() != null) {
             user.setEmail(cr.email());
         }

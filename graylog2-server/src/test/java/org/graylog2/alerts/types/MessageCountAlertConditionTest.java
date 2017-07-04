@@ -17,6 +17,7 @@
 package org.graylog2.alerts.types;
 
 import org.graylog2.alerts.AlertConditionTest;
+import org.graylog2.indexer.InvalidRangeFormatException;
 import org.graylog2.indexer.results.CountResult;
 import org.graylog2.plugin.Tools;
 import org.graylog2.plugin.alarms.AlertCondition;
@@ -128,7 +129,11 @@ public class MessageCountAlertConditionTest extends AlertConditionTest {
         final CountResult countResult = mock(CountResult.class);
         when(countResult.count()).thenReturn(count);
 
-        when(searches.count(anyString(), any(TimeRange.class), anyString())).thenReturn(countResult);
+        try {
+            when(searches.count(anyString(), any(TimeRange.class), anyString())).thenReturn(countResult);
+        } catch (InvalidRangeFormatException e) {
+            assertNotNull("This should not return an exception!", e);
+        }
     }
 
     private MessageCountAlertCondition getMessageCountAlertCondition(Map<String, Object> parameters, String title) {

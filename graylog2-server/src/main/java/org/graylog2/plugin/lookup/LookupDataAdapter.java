@@ -16,112 +16,136 @@
  */
 package org.graylog2.plugin.lookup;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.util.concurrent.AbstractIdleService;
-import com.google.inject.assistedinject.Assisted;
+import org.graylog2.lookup.LookupTable;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
+import javax.inject.Named;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.base.Preconditions.checkState;
-import static org.graylog2.utilities.ObjectUtils.objectId;
 
-public abstract class LookupDataAdapter extends AbstractIdleService {
+public abstract class LookupDataAdapter {
     private static final Logger LOG = LoggerFactory.getLogger(LookupDataAdapter.class);
 
-    private final String id;
-    private final String name;
+    private String id;
+    private volatile boolean started = false;
+    private volatile boolean failed = false;
+    private LookupTable lookupTable;
+    private ReentrantLock lock = new ReentrantLock();
 
     private final LookupDataAdapterConfiguration config;
-    private final Timer requestTimer;
-    private final Timer refreshTimer;
+    private final ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> refreshFuture = null;
 
-    private AtomicReference<Throwable> dataSourceError = new AtomicReference<>();
-
-    protected LookupDataAdapter(String id, String name, LookupDataAdapterConfiguration config, MetricRegistry metricRegistry) {
-        this.id = id;
-        this.name = name;
+    protected LookupDataAdapter(LookupDataAdapterConfiguration config,
+                                @Named("daemonScheduler") ScheduledExecutorService scheduler) {
         this.config = config;
-
-        this.requestTimer = metricRegistry.timer(MetricRegistry.name("org.graylog2.lookup.adapters", id, "requests"));
-        this.refreshTimer = metricRegistry.timer(MetricRegistry.name("org.graylog2.lookup.adapters", id, "refresh"));
+        this.scheduler = scheduler;
     }
 
-    @Override
-    protected void startUp() throws Exception {
-        // Make sure startUp() never throws an error - we handle errors internally
+    public boolean isStarted() {
+        return started;
+    }
+
+    public boolean isFailed() {
+        return failed;
+    }
+
+    public void start() {
+        if (started) {
+            return;
+        }
+        lock.lock();
         try {
             doStart();
+            started = true;
+            failed = false;
+
+            try {
+                final Duration interval = refreshInterval();
+                if (!interval.equals(Duration.ZERO)) {
+                    LOG.debug("Schedule data adapter refresh method every {}ms", interval.getMillis());
+                    this.refreshFuture = scheduler.scheduleAtFixedRate(this::refresh, interval.getMillis(), interval.getMillis(), TimeUnit.MILLISECONDS);
+                }
+            } catch (Exception e) {
+                // XXX Should this set the data adapter into failed state?
+                LOG.error("Couldn't start data adapter refresh job", e);
+            }
         } catch (Exception e) {
-            LOG.error("Couldn't start data adapter <{}/{}/@{}>", name(), id(), objectId(this), e);
-            setError(e);
+            LOG.error("Couldn't start data adapter", e);
+            failed = true;
+        } finally {
+            lock.unlock();
         }
     }
-
     protected abstract void doStart() throws Exception;
 
-    @Override
-    protected void shutDown() throws Exception {
-        // Make sure shutDown() never throws an error - we handle errors internally
+    public void stop() {
+        if (!started) {
+            return;
+        }
+        lock.lock();
         try {
+            if (refreshFuture != null && !refreshFuture.isCancelled()) {
+                refreshFuture.cancel(true);
+            }
             doStop();
+            started = false;
         } catch (Exception e) {
-            LOG.error("Couldn't stop data adapter <{}/{}/@{}>", name(), id(), objectId(this), e);
+            LOG.error("Couldn't stop data adapter", e);
+            failed = true;
+        } finally {
+            lock.unlock();
         }
     }
-
     protected abstract void doStop() throws Exception;
 
     /**
      * Returns the refresh interval for this data adapter. Use {@link Duration#ZERO} if refresh should be disabled.
      * @return the refresh interval
      */
-    public abstract Duration refreshInterval();
+    protected abstract Duration refreshInterval();
 
-    public void refresh(LookupCachePurge cachePurge) {
-        // Make sure refresh() never throws an error - we handle errors internally
-        try (final Timer.Context ignored = refreshTimer.time()) {
-            doRefresh(cachePurge);
+    public void refresh() {
+        try {
+            doRefresh();
         } catch (Exception e) {
-            LOG.error("Couldn't refresh data adapter <{}/{}/@{}>", name(), id(), objectId(this), e);
+            LOG.error("Couldn't refresh data adapter", e);
         }
     }
+    protected abstract void doRefresh() throws Exception;
 
-    protected abstract void doRefresh(LookupCachePurge cachePurge) throws Exception;
-
-    protected void clearError() {
-        dataSourceError.set(null);
-    }
-
-    public Optional<Throwable> getError() {
-        return Optional.ofNullable(dataSourceError.get());
-    }
-
-    protected void setError(Throwable throwable) {
-        dataSourceError.set(throwable);
-    }
-
+    @Nullable
     public String id() {
         return id;
     }
 
-    public String name() {
-        return name;
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public LookupTable getLookupTable() {
+        checkState(lookupTable != null, "lookup table cannot be null");
+        return lookupTable;
+    }
+
+    public void setLookupTable(LookupTable lookupTable) {
+        this.lookupTable = lookupTable;
     }
 
     public LookupResult get(Object key) {
-        if (state() == State.FAILED) {
+        if (failed) {
             return LookupResult.empty();
         }
-        checkState(isRunning(), "Data adapter needs to be started before it can be used");
-        try (final Timer.Context ignored = requestTimer.time()) {
-            return doGet(key);
-        }
+        checkState(started, "Data adapter needs to be started before it can be used");
+        return doGet(key);
     }
     protected abstract LookupResult doGet(Object key);
 
@@ -131,9 +155,8 @@ public abstract class LookupDataAdapter extends AbstractIdleService {
         return config;
     }
 
-
     public interface Factory<T extends LookupDataAdapter> {
-        T create(@Assisted("id") String id, @Assisted("name") String name, LookupDataAdapterConfiguration configuration);
+        T create(LookupDataAdapterConfiguration configuration);
 
         Descriptor getDescriptor();
     }

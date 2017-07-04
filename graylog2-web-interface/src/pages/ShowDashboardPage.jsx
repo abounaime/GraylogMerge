@@ -119,9 +119,6 @@ const ShowDashboardPage = React.createClass({
   _dashboardIsEmpty(dashboard) {
     return dashboard.widgets.length === 0;
   },
-  _validDimension(dimension) {
-    return Number.isInteger(dimension) && dimension > 0;
-  },
   formatDashboard(dashboard) {
     if (this._dashboardIsEmpty(dashboard)) {
       return this.emptyDashboard();
@@ -134,8 +131,8 @@ const ShowDashboardPage = React.createClass({
       positions[widget.id] = {
         col: (persistedDimensions.col === undefined ? defaultDimensions.col : persistedDimensions.col),
         row: (persistedDimensions.row === undefined ? defaultDimensions.row : persistedDimensions.row),
-        height: (this._validDimension(persistedDimensions.height) ? persistedDimensions.height : defaultDimensions.height),
-        width: (this._validDimension(persistedDimensions.width) ? persistedDimensions.width : defaultDimensions.width),
+        height: (persistedDimensions.height === undefined ? defaultDimensions.height : persistedDimensions.height),
+        width: (persistedDimensions.width === undefined ? defaultDimensions.width : persistedDimensions.width),
       };
     });
 

@@ -16,7 +16,6 @@
  */
 package org.graylog2.bindings.providers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.graylog2.bundles.BundleImporter;
 import org.graylog2.dashboards.DashboardService;
 import org.graylog2.dashboards.widgets.DashboardWidgetCreator;
@@ -24,11 +23,7 @@ import org.graylog2.events.ClusterEventBus;
 import org.graylog2.grok.GrokPatternService;
 import org.graylog2.indexer.IndexSetRegistry;
 import org.graylog2.inputs.InputService;
-import org.graylog2.inputs.converters.ConverterFactory;
 import org.graylog2.inputs.extractors.ExtractorFactory;
-import org.graylog2.lookup.db.DBCacheService;
-import org.graylog2.lookup.db.DBDataAdapterService;
-import org.graylog2.lookup.db.DBLookupTableService;
 import org.graylog2.plugin.ServerStatus;
 import org.graylog2.shared.inputs.InputLauncher;
 import org.graylog2.shared.inputs.InputRegistry;
@@ -46,7 +41,6 @@ public class BundleImporterProvider implements Provider<BundleImporter> {
     private final InputService inputService;
     private final InputRegistry inputRegistry;
     private final ExtractorFactory extractorFactory;
-    private final ConverterFactory converterFactory;
     private final StreamService streamService;
     private final StreamRuleService streamRuleService;
     private final IndexSetRegistry indexSetRegistry;
@@ -57,18 +51,13 @@ public class BundleImporterProvider implements Provider<BundleImporter> {
     private final MessageInputFactory messageInputFactory;
     private final InputLauncher inputLauncher;
     private final GrokPatternService grokPatternService;
-    private final DBLookupTableService dbLookupTableService;
-    private final DBCacheService dbCacheService;
-    private final DBDataAdapterService dbDataAdapterService;
     private final TimeRangeFactory timeRangeFactory;
     private final ClusterEventBus clusterBus;
-    private final ObjectMapper objectMapper;
 
     @Inject
     public BundleImporterProvider(final InputService inputService,
                                   final InputRegistry inputRegistry,
                                   final ExtractorFactory extractorFactory,
-                                  final ConverterFactory converterFactory,
                                   final StreamService streamService,
                                   final StreamRuleService streamRuleService,
                                   final IndexSetRegistry indexSetRegistry,
@@ -79,16 +68,11 @@ public class BundleImporterProvider implements Provider<BundleImporter> {
                                   final MessageInputFactory messageInputFactory,
                                   final InputLauncher inputLauncher,
                                   final GrokPatternService grokPatternService,
-                                  final DBLookupTableService dbLookupTableService,
-                                  final DBCacheService dbCacheService,
-                                  final DBDataAdapterService dbDataAdapterService,
                                   final TimeRangeFactory timeRangeFactory,
-                                  final ClusterEventBus clusterBus,
-                                  final ObjectMapper objectMapper) {
+                                  final ClusterEventBus clusterBus) {
         this.inputService = inputService;
         this.inputRegistry = inputRegistry;
         this.extractorFactory = extractorFactory;
-        this.converterFactory = converterFactory;
         this.streamService = streamService;
         this.streamRuleService = streamRuleService;
         this.indexSetRegistry = indexSetRegistry;
@@ -99,21 +83,15 @@ public class BundleImporterProvider implements Provider<BundleImporter> {
         this.messageInputFactory = messageInputFactory;
         this.inputLauncher = inputLauncher;
         this.grokPatternService = grokPatternService;
-        this.dbLookupTableService = dbLookupTableService;
-        this.dbCacheService = dbCacheService;
-        this.dbDataAdapterService = dbDataAdapterService;
         this.timeRangeFactory = timeRangeFactory;
         this.clusterBus = clusterBus;
-        this.objectMapper = objectMapper;
     }
 
     @Override
     public BundleImporter get() {
-        return new BundleImporter(inputService, inputRegistry, extractorFactory, converterFactory,
+        return new BundleImporter(inputService, inputRegistry, extractorFactory,
                 streamService, streamRuleService, indexSetRegistry, outputService, dashboardService,
                 dashboardWidgetCreator, serverStatus, messageInputFactory,
-                inputLauncher, grokPatternService,
-                dbLookupTableService, dbCacheService, dbDataAdapterService,
-                timeRangeFactory, clusterBus, objectMapper);
+                inputLauncher, grokPatternService, timeRangeFactory, clusterBus);
     }
 }

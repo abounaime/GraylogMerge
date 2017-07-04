@@ -56,12 +56,6 @@ public class ConfigurationBundle {
     private Set<Dashboard> dashboards = Collections.emptySet();
     @JsonProperty
     private Set<GrokPattern> grokPatterns = Collections.emptySet();
-    @JsonProperty
-    private Set<LookupTableBundle> lookupTables = Collections.emptySet();
-    @JsonProperty
-    private Set<LookupCacheBundle> lookupCaches = Collections.emptySet();
-    @JsonProperty
-    private Set<LookupDataAdapterBundle> lookupDataAdapters = Collections.emptySet();
 
     public String getId() {
         return id;
@@ -133,29 +127,5 @@ public class ConfigurationBundle {
 
     public void setGrokPatterns(Set<GrokPattern> grokPatterns) {
         this.grokPatterns = grokPatterns;
-    }
-
-    public Set<LookupTableBundle> getLookupTables() {
-        return lookupTables;
-    }
-
-    public void setLookupTables(Set<LookupTableBundle> lookupTables) {
-        this.lookupTables = lookupTables;
-    }
-
-    public Set<LookupCacheBundle> getLookupCaches() {
-        return lookupCaches;
-    }
-
-    public void setLookupCaches(Set<LookupCacheBundle> lookupCaches) {
-        this.lookupCaches = lookupCaches;
-    }
-
-    public Set<LookupDataAdapterBundle> getLookupDataAdapters() {
-        return lookupDataAdapters;
-    }
-
-    public void setLookupDataAdapters(Set<LookupDataAdapterBundle> lookupDataAdapters) {
-        this.lookupDataAdapters = lookupDataAdapters;
     }
 }

@@ -16,7 +16,6 @@
  */
 package org.graylog2.lookup.caches;
 
-import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
@@ -27,67 +26,42 @@ import com.google.inject.assistedinject.Assisted;
 import org.graylog.autovalue.WithBeanGetter;
 import org.graylog2.plugin.lookup.LookupCache;
 import org.graylog2.plugin.lookup.LookupCacheConfiguration;
-import org.graylog2.plugin.lookup.LookupCacheKey;
 import org.graylog2.plugin.lookup.LookupResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.Callable;
 
 /**
  * The cache that doesn't. Used in place when no cache is wanted, having a null implementation saves us ugly null checks.
  */
 public class NullCache extends LookupCache {
-    private static final Logger LOG = LoggerFactory.getLogger(NullCache.class);
 
     public static final String NAME = "none";
 
     @Inject
-    public NullCache(@Assisted("id") String id,
-                     @Assisted("name") String name,
-                     @Assisted LookupCacheConfiguration c,
-                     MetricRegistry metricRegistry) {
-        super(id, name, c, metricRegistry);
+    public NullCache(@Assisted LookupCacheConfiguration c) {
+        super(c);
     }
 
     @Override
-    protected void doStart() throws Exception {
-        // nothing to do
+    public LookupResult get(Object key) {
+        return getLookupTable().dataAdapter().get(key);
     }
 
     @Override
-    protected void doStop() throws Exception {
-        // nothing to do
-    }
-
-    @Override
-    public LookupResult get(LookupCacheKey key, Callable<LookupResult> loader) {
-        try {
-            return loader.call();
-        } catch (Exception e) {
-            LOG.warn("Loading value from data adapter failed for key {}, returning empty result", key, e);
-            return LookupResult.empty();
-        }
-    }
-
-    @Override
-    public LookupResult getIfPresent(LookupCacheKey key) {
-        return LookupResult.empty();
+    public void set(Object key, Object retrievedValue) {
+        getLookupTable().dataAdapter().set(key, retrievedValue);
     }
 
     @Override
     public void purge() {
-        // nothing to do
     }
 
     @Override
-    public void purge(LookupCacheKey purgeKey) {
-        // nothing to do
+    public void purge(Object key) {
     }
+
 
     public interface Factory extends LookupCache.Factory {
         @Override
-        NullCache create(@Assisted("id") String id, @Assisted("name") String name, LookupCacheConfiguration configuration);
+        NullCache create(LookupCacheConfiguration configuration);
 
         @Override
         NullCache.Descriptor getDescriptor();

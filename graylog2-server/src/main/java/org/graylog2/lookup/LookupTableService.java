@@ -16,477 +16,190 @@
  */
 package org.graylog2.lookup;
 
-import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
-import com.google.common.util.concurrent.AbstractIdleService;
-import org.graylog2.lookup.db.DBCacheService;
-import org.graylog2.lookup.db.DBDataAdapterService;
-import org.graylog2.lookup.db.DBLookupTableService;
 import org.graylog2.lookup.dto.CacheDto;
 import org.graylog2.lookup.dto.DataAdapterDto;
 import org.graylog2.lookup.dto.LookupTableDto;
-import org.graylog2.lookup.events.CachesDeleted;
-import org.graylog2.lookup.events.CachesUpdated;
-import org.graylog2.lookup.events.DataAdaptersDeleted;
-import org.graylog2.lookup.events.DataAdaptersUpdated;
 import org.graylog2.lookup.events.LookupTablesDeleted;
 import org.graylog2.lookup.events.LookupTablesUpdated;
 import org.graylog2.plugin.lookup.LookupCache;
 import org.graylog2.plugin.lookup.LookupDataAdapter;
 import org.graylog2.plugin.lookup.LookupResult;
-import org.graylog2.utilities.LatchUpdaterListener;
-import org.graylog2.utilities.LoggingServiceListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
-import static com.google.common.util.concurrent.Uninterruptibles.awaitUninterruptibly;
-import static java.lang.Math.toIntExact;
-import static org.graylog2.shared.utilities.ExceptionUtils.getRootCauseMessage;
-import static org.graylog2.utilities.ObjectUtils.objectId;
-
-/**
- * This service maintains the in-memory adapters, caches and lookup table instances.
- * <p>
- * It initially loads all entities and starts them, and later reacts on event bus messages to reflect the current system state.
- */
 @Singleton
-public class LookupTableService extends AbstractIdleService {
+public class LookupTableService {
     private static final Logger LOG = LoggerFactory.getLogger(LookupTableService.class);
 
-    private DBDataAdapterService dbAdapters;
-    private final DBCacheService dbCaches;
-    private final DBLookupTableService dbTables;
+    private final MongoLutService mongoLutService;
+    private final MongoLutCacheService cacheService;
+    private final MongoLutDataAdapterService dataAdapterService;
+    private final LookupTableCreator.Factory tableCreatorFactory;
 
-    private final Map<String, LookupCache.Factory> cacheFactories;
-    private final Map<String, LookupDataAdapter.Factory> adapterFactories;
-    private final ScheduledExecutorService scheduler;
-    private final EventBus eventBus;
-    private final LookupDataAdapterRefreshService adapterRefreshService;
-
-    private final ConcurrentMap<String, LookupTable> liveTables = new ConcurrentHashMap<>();
-
-    private final ConcurrentMap<String, LookupDataAdapter> idToAdapter = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, LookupDataAdapter> liveAdapters = new ConcurrentHashMap<>();
-
-    private final ConcurrentMap<String, LookupCache> idToCache = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, LookupCache> liveCaches = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, LookupTable> lookupTables = new ConcurrentHashMap<>();
 
     @Inject
-    public LookupTableService(DBDataAdapterService dbAdapters,
-                              DBCacheService dbCaches,
-                              DBLookupTableService dbTables,
-                              Map<String, LookupCache.Factory> cacheFactories,
-                              Map<String, LookupDataAdapter.Factory> adapterFactories,
-                              @Named("daemonScheduler") ScheduledExecutorService scheduler,
-                              EventBus eventBus) {
-        this.dbAdapters = dbAdapters;
-        this.dbCaches = dbCaches;
-        this.dbTables = dbTables;
-        this.cacheFactories = cacheFactories;
-        this.adapterFactories = adapterFactories;
-        this.scheduler = scheduler;
-        this.eventBus = eventBus;
-        this.adapterRefreshService = new LookupDataAdapterRefreshService(scheduler, liveTables);
+    public LookupTableService(MongoLutService mongoLutService,
+                              MongoLutCacheService cacheService,
+                              MongoLutDataAdapterService dataAdapterService,
+                              LookupTableCreator.Factory tableCreatorFactory,
+                              EventBus serverEventBus) {
+        this.mongoLutService = mongoLutService;
+        this.cacheService = cacheService;
+        this.dataAdapterService = dataAdapterService;
+        this.tableCreatorFactory = tableCreatorFactory;
+
+        // Initialize all lookup tables before subscribing to events
+        initialize();
+
+        // TODO: This object should have life cycle management. For now it needs to be a singleton to avoid leaking references in the event bus.
+        serverEventBus.register(this);
     }
 
-    @Override
-    protected void startUp() throws Exception {
-        // Start refresh service and wait until it's running so the adapters can register themselves
-        adapterRefreshService.startAsync().awaitRunning();
+    private void activateTable(String name, @Nullable LookupTable existingTable, LookupTable newTable) {
+        // Always start the new data adapter before taking it live, it's a no-op if the adapter is already started
+        newTable.dataAdapter().start();
 
-        // first load the adapters and caches and start them one by one, then create the lookup tables
-        final CountDownLatch adaptersLatch = createAndStartAdapters();
-        final CountDownLatch cachesLatch = createAndStartCaches();
+        lookupTables.put(name, newTable);
 
-        // we want to give all adapters and caches a chance to succeed or fail early before we create the lookup tables
-        adaptersLatch.await();
-        cachesLatch.await();
-
-        createLookupTables();
-
-        eventBus.register(this);
-    }
-
-    @SuppressWarnings("Duplicates")
-    @Override
-    protected void shutDown() throws Exception {
-        eventBus.unregister(this);
-
-        // take all tables offline
-        liveTables.clear();
-
-        // take the caches and adapters offline and de-register their name/id mappings
-        liveCaches.forEach((name, cache) -> {
-            cache.addListener(new Listener() {
-                @Override
-                public void terminated(State from) {
-                    idToCache.remove(cache.id());
-                    liveCaches.remove(name);
-                }
-            }, scheduler);
-            cache.stopAsync();
-        });
-        liveAdapters.forEach((name, adapter) -> {
-            adapter.addListener(new Listener() {
-                @Override
-                public void terminated(State from) {
-                    idToAdapter.remove(adapter.id());
-                    liveAdapters.remove(name);
-                }
-            }, scheduler);
-            adapter.stopAsync();
-        });
-
-        // Stop data adapter refresh service
-        adapterRefreshService.stopAsync();
-    }
-
-    @Subscribe
-    public void handleAdapterUpdate(DataAdaptersUpdated updated) {
-        scheduler.schedule(() -> {
-            // when a data adapter is updated, the lookup tables that use it need to be updated as well
-            // first we create the new adapter instance and start it
-            // then we retrieve the old one so we can safely stop it later
-            // then we build a new lookup table instance with the new adapter instance
-            // last we can remove the old lookup table instance and stop the original adapter
-            final Collection<LookupTableDto> tablesToUpdate = dbTables.findByDataAdapterIds(updated.ids());
-
-            // collect old adapter instances
-            final ImmutableSet.Builder<LookupDataAdapter> existingAdapters = ImmutableSet.builder();
-
-            // create new adapter and lookup table instances
-            final Set<LookupDataAdapter> newAdapters = dbAdapters.findByIds(updated.ids()).stream()
-                    .map(dto -> createAdapter(dto, existingAdapters))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-
-            final CountDownLatch runningLatch = new CountDownLatch(newAdapters.size());
-
-            newAdapters.forEach(adapter -> {
-                adapter.addListener(new LatchUpdaterListener(runningLatch), scheduler);
-                adapter.startAsync();
-            });
-            // wait until everything is either running or failed before starting the
-            awaitUninterruptibly(runningLatch);
-
-            tablesToUpdate.forEach(this::createLookupTable);
-
-            // stop old adapters
-            existingAdapters.build().forEach(AbstractIdleService::stopAsync);
-
-        }, 0, TimeUnit.SECONDS);
-    }
-
-    @Subscribe
-    public void handleAdapterDelete(DataAdaptersDeleted deleted) {
-        scheduler.schedule(() -> deleted.ids().stream()
-                .map(idToAdapter::remove)
-                .filter(Objects::nonNull)
-                .forEach(dataAdapter -> {
-                    liveAdapters.remove(dataAdapter.name());
-                    dataAdapter.stopAsync();
-                }), 0, TimeUnit.SECONDS);
-    }
-
-    @Subscribe
-    public void handleCacheUpdate(CachesUpdated updated) {
-        scheduler.schedule(() -> {
-            // when a cache is updated, the lookup tables that use it need to be updated as well
-            // first we create the new cache instance and start it
-            // then we retrieve the old one so we can safely stop it later
-            // then we build a new lookup table instance with the new cache instance
-            // last we can remove the old lookup table instance and stop the original cache
-            final Collection<LookupTableDto> tablesToUpdate = dbTables.findByCacheIds(updated.ids());
-
-            // collect old cache instances
-            final ImmutableSet.Builder<LookupCache> existingCaches = ImmutableSet.builder();
-
-            // create new cache and lookup table instances
-            final Set<LookupCache> newCaches = dbCaches.findByIds(updated.ids()).stream()
-                    .map(dto -> createCache(dto, existingCaches))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-
-            final CountDownLatch runningLatch = new CountDownLatch(newCaches.size());
-
-            newCaches.forEach(cache -> {
-                cache.addListener(new LatchUpdaterListener(runningLatch), scheduler);
-                cache.startAsync();
-            });
-            // wait until everything is either running or failed before starting the
-            awaitUninterruptibly(runningLatch);
-
-            tablesToUpdate.forEach(this::createLookupTable);
-
-            // stop old caches
-            existingCaches.build().forEach(AbstractIdleService::stopAsync);
-        }, 0, TimeUnit.SECONDS);
-    }
-
-    @Subscribe
-    public void handleCacheDelete(CachesDeleted deleted) {
-        scheduler.schedule(() -> deleted.ids().stream()
-                .map(idToCache::remove)
-                .filter(Objects::nonNull)
-                .forEach(lookupCache -> {
-                    liveCaches.remove(lookupCache.name());
-                    lookupCache.stopAsync();
-                }), 0, TimeUnit.SECONDS);
-    }
-
-    @Subscribe
-    public void handleLookupTableUpdate(LookupTablesUpdated updated) {
-        scheduler.schedule(() -> {
-            // load the DTO, and recreate the table
-            updated.lookupTableIds().forEach(id -> dbTables.get(id).map(this::createLookupTable));
-        }, 0, TimeUnit.SECONDS);
-    }
-
-    @Subscribe
-    public void handleLookupTableDelete(LookupTablesDeleted deleted) {
-        scheduler.schedule(() -> deleted.lookupTableNames().forEach(liveTables::remove), 0, TimeUnit.SECONDS);
-    }
-
-    private CountDownLatch createAndStartAdapters() {
-        final Set<LookupDataAdapter> adapters = dbAdapters.streamAll()
-                .map(dto -> createAdapter(dto, null))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        final CountDownLatch latch = new CountDownLatch(toIntExact(adapters.size()));
-
-        adapters.forEach(adapter -> {
-            adapter.addListener(new LatchUpdaterListener(latch), scheduler);
-            adapter.startAsync();
-        });
-        return latch;
-    }
-
-    private LookupDataAdapter createAdapter(DataAdapterDto dto, ImmutableSet.Builder<LookupDataAdapter> existingAdapters) {
-        try {
-            final LookupDataAdapter.Factory factory = adapterFactories.get(dto.config().type());
-            if (factory == null) {
-                LOG.warn("Unable to load data adapter {} of type {}, missing a factory. Is a required plugin missing?", dto.name(), dto.config().type());
-                // TODO system notification
-                return null;
+        if (existingTable != null) {
+            // If the new table has a new data adapter, stop the old one to free up resources
+            // This needs to happen after the new table is live
+            if (!Objects.equals(existingTable.dataAdapter(), newTable.dataAdapter())) {
+                existingTable.dataAdapter().stop();
             }
-            final LookupDataAdapter adapter = factory.create(dto.id(), dto.name(), dto.config());
-            adapter.addListener(new LoggingServiceListener(
-                            "Data Adapter",
-                            String.format(Locale.ENGLISH, "%s/%s [@%s]", dto.name(), dto.id(), objectId(adapter)),
-                            LOG),
-                    scheduler);
-            adapter.addListener(new Listener() {
-                @Override
-                public void running() {
-                    idToAdapter.put(dto.id(), adapter);
-                    final LookupDataAdapter existing = liveAdapters.put(dto.name(), adapter);
-                    if (existing != null && existingAdapters != null) {
-                        existingAdapters.add(existing);
-                    }
-                }
-
-                @Override
-                public void failed(State from, Throwable failure) {
-                    LOG.warn("Unable to start data adapter {}: {}", dto.name(), getRootCauseMessage(failure));
-                }
-            }, scheduler);
-            // Each adapter needs to be added to the refresh scheduler
-            adapter.addListener(adapterRefreshService.newServiceListener(adapter), scheduler);
-            return adapter;
-        } catch (Exception e) {
-            LOG.error("Couldn't create adapter <{}/{}>", dto.name(), dto.id(), e);
-            return null;
         }
     }
 
-    private CountDownLatch createAndStartCaches() {
-        final Set<LookupCache> caches = dbCaches.streamAll()
-                .map(dto -> createCache(dto, null))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        final CountDownLatch latch = new CountDownLatch(toIntExact(caches.size()));
+    private void initialize() {
+        final Collection<LookupTableDto> lookupTableDtos = mongoLutService.findAll();
+        final LookupTableCreator tableCreator = tableCreatorFactory.create(lookupTableDtos);
 
-        caches.forEach(lookupCache -> {
-            lookupCache.addListener(new LatchUpdaterListener(latch), scheduler);
-            lookupCache.startAsync();
-        });
-        return latch;
-    }
+        lookupTableDtos.forEach(dto -> {
+            final Optional<LookupTable> optionalLookupTable = tableCreator.createLookupTable(dto);
 
-    private LookupCache createCache(CacheDto dto, @Nullable ImmutableSet.Builder<LookupCache> existingCaches) {
-        try {
-            final LookupCache.Factory factory = cacheFactories.get(dto.config().type());
-            if (factory == null) {
-                LOG.warn("Unable to load cache {} of type {}, missing a factory. Is a required plugin missing?", dto.name(), dto.config().type());
-                // TODO system notification
-                return null;
+            if (optionalLookupTable.isPresent()) {
+                final LookupTable lookupTable = optionalLookupTable.get();
+
+                // Make the table available
+                activateTable(dto.name(), null, lookupTable);
+            } else {
+                LOG.warn("Not loading lookup table {} due to errors", dto.name());
             }
-            final LookupCache cache = factory.create(dto.id(), dto.name(), dto.config());
-            cache.addListener(new LoggingServiceListener(
-                            "Cache",
-                            String.format(Locale.ENGLISH, "%s/%s [@%s]", dto.name(), dto.id(), objectId(cache)),
-                            LOG),
-                    scheduler);
-            cache.addListener(new Listener() {
-                @Override
-                public void running() {
-                    idToCache.put(dto.id(), cache);
-                    final LookupCache existing = liveCaches.put(dto.name(), cache);
-                    if (existing != null && existingCaches != null) {
-                        existingCaches.add(existing);
-                    }
-                }
+        });
+    }
 
-                @Override
-                public void failed(State from, Throwable failure) {
-                    LOG.warn("Unable to start cache {}: {}", dto.name(), getRootCauseMessage(failure));
+    private void updateTable(String name, @Nullable LookupTable existingTable) {
+        LOG.debug("Updating lookup table: {}", name);
+
+        Optional<LookupTableDto> dtoOptional = mongoLutService.get(name);
+        if (!dtoOptional.isPresent()) {
+            LOG.warn("Update event received for missing lookup table '{}', remove this event.", name);
+            return;
+        }
+
+        LookupTableDto dto = dtoOptional.get();
+        Optional<CacheDto> cacheDtoOptional = cacheService.get(dto.cacheId());
+        Optional<DataAdapterDto> dataAdapterDtoOptional = dataAdapterService.get(dto.dataAdapterId());
+
+        if (!cacheDtoOptional.isPresent() || !dataAdapterDtoOptional.isPresent()) {
+            LOG.warn("Missing cache or data adapter for lookup table {}. Not loading lookup table.", name);
+            return;
+        }
+
+        CacheDto cacheDto = cacheDtoOptional.get();
+        DataAdapterDto adapterDto = dataAdapterDtoOptional.get();
+
+        LookupTableCreator tableCreator = tableCreatorFactory.create(Collections.singleton(dto));
+
+        Optional<LookupTable> tableOptional;
+        if (existingTable == null) {
+            LOG.debug("Creating new lookup table instance: {}", name);
+            // If there is no existing table, we just create a completely new one
+            tableOptional = tableCreator.createLookupTable(dto);
+        } else {
+            // Otherwise we check if we have to re-create the cache or the data adapter objects
+            LookupCache cache;
+            if (existingTable.cache().getConfig().equals(cacheDto.config())) {
+                LOG.debug("Reusing existing cache instance: {}", cacheDto.name());
+                // configuration is the same, we do not need to recreate the cache (so it can retain its state)
+                cache = existingTable.cache();
+            } else {
+                LOG.debug("Creating new cache instance: {}");
+                Optional<LookupCache> newCache = tableCreator.createCache(dto);
+                if (!newCache.isPresent()) {
+                    LOG.warn("Cache creation failed. Not creating new lookup table.");
+                    return;
                 }
-            }, scheduler);
-            return cache;
-        } catch (Exception e) {
-            LOG.error("Couldn't create cache <{}/{}>", dto.name(), dto.id(), e);
-            return null;
+                cache = newCache.get();
+            }
+            LookupDataAdapter dataAdapter;
+            if (existingTable.dataAdapter().getConfig().equals(adapterDto.config())) {
+                LOG.debug("Reusing existing data adapter instance: {}", adapterDto.name());
+                // configuration is the same, do not recreate the adapter (so it can retain its connections etc)
+                dataAdapter = existingTable.dataAdapter();
+            } else {
+                LOG.debug("Creating new data adapter instance: {}", adapterDto.name());
+                Optional<LookupDataAdapter> newAdapter = tableCreator.createDataAdapter(dto);
+                if (!newAdapter.isPresent()) {
+                    LOG.warn("Data adapter creation failed. Not creating new lookup table.");
+                    return;
+                }
+                dataAdapter = newAdapter.get();
+            }
+            tableOptional = tableCreator.createLookupTable(dto, cache, dataAdapter);
+        }
+
+        if (tableOptional.isPresent()) {
+            activateTable(name, existingTable, tableOptional.get());
+        } else {
+            LOG.warn("Not loading lookup table {} due to errors", dto.name());
         }
     }
 
-    private void createLookupTables() {
-        try {
-            dbTables.forEach(dto -> {
-                try {
-                    createLookupTable(dto);
-                } catch (Exception e) {
-                    LOG.error("Couldn't create lookup table <{}/{}>: {}", dto.name(), dto.id(), e.getMessage());
-                }
-            });
-        } catch (Exception e) {
-            LOG.error("Couldn't create lookup tables", e);
-        }
+    @Subscribe
+    public void handleLookupTableUpdate(LookupTablesUpdated event) {
+        // TODO use executor and call initialize/update/start or similar on lookup table
+        event.lookupTableNames().forEach(name -> updateTable(name, lookupTables.get(name)));
     }
 
-    private LookupTable createLookupTable(LookupTableDto dto) {
-        final LookupCache cache = idToCache.get(dto.cacheId());
-        if (cache == null) {
-            LOG.warn("Lookup table {} is referencing a missing cache {}, check if it started properly.",
-                    dto.name(), dto.cacheId());
-            return null;
-        }
-        final LookupDataAdapter adapter = idToAdapter.get(dto.dataAdapterId());
-        if (adapter == null) {
-            LOG.warn("Lookup table {} is referencing a missing data adapter {}, check if it started properly.",
-                    dto.name(), dto.dataAdapterId());
-            return null;
-        }
-
-        final LookupDefaultSingleValue defaultSingleValue;
-        try {
-            defaultSingleValue = LookupDefaultSingleValue.create(dto.defaultSingleValue(), dto.defaultSingleValueType());
-        } catch (Exception e) {
-            LOG.error("Could not create default single value object for lookup table {}/{}: {}", dto.name(), dto.id(), e.getMessage());
-            return null;
-        }
-        final LookupDefaultMultiValue defaultMultiValue;
-        try {
-            defaultMultiValue = LookupDefaultMultiValue.create(dto.defaultMultiValue(), dto.defaultMultiValueType());
-        } catch (Exception e) {
-            LOG.error("Could not create default multi value object for lookup table {}/{}: {}", dto.name(), dto.id(), e.getMessage());
-            return null;
-        }
-
-        final LookupTable table = LookupTable.builder()
-                .id(dto.id())
-                .name(dto.name())
-                .description(dto.description())
-                .title(dto.title())
-                .cache(cache)
-                .dataAdapter(adapter)
-                .defaultSingleValue(defaultSingleValue)
-                .defaultMultiValue(defaultMultiValue)
-                .build();
-        final LookupCache newCache = table.cache();
-        final LookupDataAdapter newAdapter = table.dataAdapter();
-        LOG.info("Starting lookup table {}/{} [@{}] using cache {}/{} [@{}], data adapter {}/{} [@{}]",
-                table.name(), table.id(), objectId(table),
-                newCache.name(), newCache.id(), objectId(newCache),
-                newAdapter.name(), newAdapter.id(), objectId(newAdapter));
-        final LookupTable previous = liveTables.put(dto.name(), table);
-        if (previous != null) {
-            LOG.info("Replaced previous lookup table {} [@{}]", previous.name(), objectId(previous));
-        }
-        return table;
+    @Subscribe
+    public void handleLookupTableDeletion(LookupTablesDeleted event) {
+        // TODO use executor and call stop/clean/teardown on lookup table
+        event.lookupTableNames().forEach(lookupTables::remove);
     }
 
-    public LookupTableService.Builder newBuilder() {
-        return new LookupTableService.Builder(this);
+    public Builder newBuilder() {
+        return new Builder(this);
     }
 
     @Nullable
     private LookupTable getTable(String name) {
-        final LookupTable lookupTable = liveTables.get(name);
+        final LookupTable lookupTable = lookupTables.get(name);
         if (lookupTable == null) {
             LOG.warn("Lookup table <{}> does not exist", name);
         }
         return lookupTable;
     }
 
-    public boolean hasTable(String name) {
-        // Do a quick check in the live tables first
-        if (liveTables.containsKey(name)) {
-            return true;
-        } else {
-            try {
-                // Do a more expensive DB lookup as fallback (live tables might not be populated yet)
-                return dbTables.get(name).isPresent();
-            } catch (Exception e) {
-                LOG.error("Couldn't load lookup table <{}> from database", name, e);
-                return false;
-            }
-        }
-    }
-
-    public Collection<LookupDataAdapter> getDataAdapters(Set<String> adapterNames) {
-        if (adapterNames == null) {
-            return Collections.emptySet();
-        }
-        return adapterNames.stream()
-                .map(liveAdapters::get)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-    }
-
-    public Collection<LookupCache> getCaches(Set<String> cacheNames) {
-        if (cacheNames == null) {
-            return Collections.emptySet();
-        }
-        return cacheNames.stream()
-                .map(liveCaches::get)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-    }
-
-
     public static class Builder {
         private final LookupTableService lookupTableService;
 
         private String lookupTableName;
+        private Object defaultValue = null;
 
         public Builder(LookupTableService lookupTableService) {
             this.lookupTableService = lookupTableService;
@@ -497,18 +210,25 @@ public class LookupTableService extends AbstractIdleService {
             return this;
         }
 
+        public Builder defaultValue(Object value) {
+            this.defaultValue = value;
+            return this;
+        }
+
         public Function build() {
-            return new Function(lookupTableService, lookupTableName);
+            return new Function(lookupTableService, lookupTableName, defaultValue);
         }
     }
 
     public static class Function {
         private final LookupTableService lookupTableService;
         private final String lookupTableName;
+        private final Object defaultValue;
 
-        public Function(LookupTableService lookupTableService, String lookupTableName) {
+        public Function(LookupTableService lookupTableService, String lookupTableName, @Nullable Object defaultValue) {
             this.lookupTableService = lookupTableService;
             this.lookupTableName = lookupTableName;
+            this.defaultValue = defaultValue;
         }
 
         @Nullable
@@ -518,20 +238,19 @@ public class LookupTableService extends AbstractIdleService {
             // Otherwise we might hold on to an old lookup table instance when this function object is cached somewhere.
             final LookupTable lookupTable = lookupTableService.getTable(lookupTableName);
             if (lookupTable == null) {
-                return LookupResult.empty();
+                return LookupResult.single(key, defaultValue);
             }
 
             final LookupResult result = lookupTable.lookup(key);
 
             if (result == null || result.isEmpty()) {
-                return LookupResult.empty();
+                if (defaultValue == null) {
+                    return LookupResult.empty();
+                }
+                return LookupResult.single(key, defaultValue);
             }
 
             return result;
-        }
-
-        public LookupTable getTable() {
-            return lookupTableService.getTable(lookupTableName);
         }
     }
 }

@@ -30,17 +30,13 @@ import org.graylog2.indexer.indices.TooManyAliasesException;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -143,19 +139,8 @@ public class MongoIndexSetRegistry implements IndexSetRegistry {
 
     @Override
     public boolean isManagedIndex(String indexName) {
-        return isManagedIndex(findAllMongoIndexSets(), indexName);
-    }
-
-    @Override
-    public Map<String, Boolean> isManagedIndex(Collection<String> indices) {
-        final Set<MongoIndexSet> indexSets = findAllMongoIndexSets();
-        return indices.stream()
-                .collect(Collectors.toMap(Function.identity(), index -> isManagedIndex(indexSets, index)));
-    }
-
-    private boolean isManagedIndex(Collection<? extends IndexSet> indexSets, String index) {
-        for (IndexSet indexSet : indexSets) {
-            if (indexSet.isManagedIndex(index)) {
+        for (MongoIndexSet indexSet : findAllMongoIndexSets()) {
+            if (indexSet.isManagedIndex(indexName)) {
                 return true;
             }
         }

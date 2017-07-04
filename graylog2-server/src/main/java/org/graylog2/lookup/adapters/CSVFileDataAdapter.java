@@ -16,21 +16,20 @@
  */
 package org.graylog2.lookup.adapters;
 
+import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.primitives.Ints;
+import com.google.inject.assistedinject.Assisted;
+
 import au.com.bytecode.opencsv.CSVReader;
-import com.codahale.metrics.MetricRegistry;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.google.auto.value.AutoValue;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Multimap;
-import com.google.common.primitives.Ints;
-import com.google.inject.assistedinject.Assisted;
+
 import org.graylog.autovalue.WithBeanGetter;
-import org.graylog2.plugin.lookup.LookupCachePurge;
 import org.graylog2.plugin.lookup.LookupDataAdapter;
 import org.graylog2.plugin.lookup.LookupDataAdapterConfiguration;
 import org.graylog2.plugin.lookup.LookupResult;
@@ -40,19 +39,20 @@ import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.Size;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
-import java.util.Optional;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.Size;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
 
@@ -62,16 +62,14 @@ public class CSVFileDataAdapter extends LookupDataAdapter {
     public static final String NAME = "csvfile";
 
     private final Config config;
-    private final AtomicReference<Map<String, String>> lookupRef = new AtomicReference<>(ImmutableMap.of());
+    private final AtomicReference<Map<Object, Object>> lookupRef = new AtomicReference<>(ImmutableMap.of());
 
     private FileInfo fileInfo;
 
     @Inject
-    public CSVFileDataAdapter(@Assisted("id") String id,
-                              @Assisted("name") String name,
-                              @Assisted LookupDataAdapterConfiguration config,
-                              MetricRegistry metricRegistry) {
-        super(id, name, config, metricRegistry);
+    public CSVFileDataAdapter(@Named("daemonScheduler") ScheduledExecutorService scheduler,
+                              @Assisted LookupDataAdapterConfiguration config) {
+        super(config, scheduler);
         this.config = (Config) config;
     }
 
@@ -81,44 +79,43 @@ public class CSVFileDataAdapter extends LookupDataAdapter {
         if (isNullOrEmpty(config.path())) {
             throw new IllegalStateException("File path needs to be set");
         }
-        if (config.checkInterval() < 1) {
-            throw new IllegalStateException("Check interval setting cannot be smaller than 1");
-        }
 
         // Set file info before parsing the data for the first time
         fileInfo = FileInfo.forPath(Paths.get(config.path()));
         lookupRef.set(parseCSVFile());
+
+        if (config.checkInterval() < 1) {
+            throw new IllegalStateException("Check interval setting cannot be smaller than 1");
+        }
     }
 
     @Override
-    public Duration refreshInterval() {
+    protected Duration refreshInterval() {
         return Duration.standardSeconds(Ints.saturatedCast(config.checkInterval()));
     }
 
     @Override
-    protected void doRefresh(LookupCachePurge cachePurge) throws Exception {
+    protected void doRefresh() throws Exception {
         try {
             final FileInfo.Change fileChanged = fileInfo.checkForChange();
-            if (!fileChanged.isChanged() && !getError().isPresent()) {
+            if (!fileChanged.isChanged()) {
                 // Nothing to do, file did not change
                 return;
             }
 
             LOG.debug("CSV file {} has changed, updating data", config.path());
             lookupRef.set(parseCSVFile());
-            cachePurge.purgeAll();
+            getLookupTable().cache().purge();
             fileInfo = fileChanged.fileInfo();
-            clearError();
         } catch (IOException e) {
-            LOG.error("Couldn't check data adapter <{}> CSV file {} for updates: {} {}", name(), config.path(), e.getClass().getCanonicalName(), e.getMessage());
-            setError(e);
+            LOG.error("Couldn't check CSV file {} for updates", config.path(), e);
         }
     }
 
-    private Map<String, String> parseCSVFile() throws IOException {
+    private Map<Object, Object> parseCSVFile() throws IOException {
         final InputStream inputStream = Files.newInputStream(Paths.get(config.path()));
         final InputStreamReader fileReader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
-        final ImmutableMap.Builder<String, String> newLookupBuilder = ImmutableMap.builder();
+        final ImmutableMap.Builder<Object, Object> newLookupBuilder = ImmutableMap.builder();
 
         try (final CSVReader csvReader = new CSVReader(fileReader, config.separatorAsChar(), config.quotecharAsChar())) {
             int line = 0;
@@ -156,7 +153,6 @@ public class CSVFileDataAdapter extends LookupDataAdapter {
         } catch (Exception e) {
             LOG.error("Couldn't parse CSV file {} (settings separator=<{}> quotechar=<{}> key_column=<{}> value_column=<{}>)", config.path(),
                     config.separator(), config.quotechar(), config.keyColumn(), config.valueColumn(), e);
-            setError(e);
         }
 
         return newLookupBuilder.build();
@@ -169,13 +165,13 @@ public class CSVFileDataAdapter extends LookupDataAdapter {
 
     @Override
     public LookupResult doGet(Object key) {
-        final String value = lookupRef.get().get(String.valueOf(key));
+        final Object value = lookupRef.get().get(key);
 
         if (value == null) {
             return LookupResult.empty();
         }
 
-        return LookupResult.single(value);
+        return LookupResult.single(key, value);
     }
 
     @Override
@@ -185,9 +181,7 @@ public class CSVFileDataAdapter extends LookupDataAdapter {
 
     public interface Factory extends LookupDataAdapter.Factory<CSVFileDataAdapter> {
         @Override
-        CSVFileDataAdapter create(@Assisted("id") String id,
-                                  @Assisted("name") String name,
-                                  LookupDataAdapterConfiguration configuration);
+        CSVFileDataAdapter create(LookupDataAdapterConfiguration configuration);
 
         @Override
         Descriptor getDescriptor();
@@ -265,20 +259,6 @@ public class CSVFileDataAdapter extends LookupDataAdapter {
 
         public static Builder builder() {
             return new AutoValue_CSVFileDataAdapter_Config.Builder();
-        }
-
-        @Override
-        public Optional<Multimap<String, String>> validate() {
-            final ArrayListMultimap<String, String> errors = ArrayListMultimap.create();
-
-            final Path path = Paths.get(path());
-            if (!Files.exists(path)) {
-                errors.put("path", "The file does not exist.");
-            } else if (!Files.isReadable(path)) {
-                errors.put("path", "The file cannot be read.");
-            }
-
-            return errors.isEmpty() ? Optional.empty() : Optional.of(errors);
         }
 
         @AutoValue.Builder

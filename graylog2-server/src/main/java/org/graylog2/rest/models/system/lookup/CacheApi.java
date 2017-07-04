@@ -25,11 +25,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.graylog.autovalue.WithBeanGetter;
 import org.graylog2.lookup.dto.CacheDto;
 import org.graylog2.plugin.lookup.LookupCacheConfiguration;
-import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.annotation.Nullable;
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
 
 @AutoValue
 @JsonAutoDetect
@@ -42,22 +39,15 @@ public abstract class CacheApi {
     public abstract String id();
 
     @JsonProperty("title")
-    @NotEmpty
     public abstract String title();
 
     @JsonProperty("description")
     public abstract String description();
 
     @JsonProperty("name")
-    @NotEmpty
     public abstract String name();
 
-    @JsonProperty("content_pack")
-    @Nullable
-    public abstract String contentPack();
-
     @JsonProperty
-    @NotNull
     public abstract LookupCacheConfiguration config();
 
     public static Builder builder() {
@@ -70,7 +60,6 @@ public abstract class CacheApi {
                 .title(dto.title())
                 .description(dto.description())
                 .name(dto.name())
-                .contentPack(dto.contentPack())
                 .config(dto.config())
                 .build();
     }
@@ -81,7 +70,6 @@ public abstract class CacheApi {
                 .title(title())
                 .description(description())
                 .name(name())
-                .contentPack(contentPack())
                 .config(config())
                 .build();
     }
@@ -100,11 +88,8 @@ public abstract class CacheApi {
         @JsonProperty("name")
         public abstract Builder name(String name);
 
-        @JsonProperty("content_pack")
-        public abstract Builder contentPack(@Nullable String contentPack);
-
         @JsonProperty("config")
-        public abstract Builder config(@Valid LookupCacheConfiguration config);
+        public abstract Builder config(LookupCacheConfiguration config);
 
         public abstract CacheApi build();
     }

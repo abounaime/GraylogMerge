@@ -31,7 +31,6 @@ import org.graylog2.audit.AuditBindings;
 import org.graylog2.audit.AuditEventSender;
 import org.graylog2.bindings.AlarmCallbackBindings;
 import org.graylog2.bindings.ConfigurationModule;
-import org.graylog2.bindings.ElasticsearchModule;
 import org.graylog2.bindings.InitializerBindings;
 import org.graylog2.bindings.MessageFilterBindings;
 import org.graylog2.bindings.MessageOutputBindings;
@@ -43,7 +42,6 @@ import org.graylog2.bindings.WidgetStrategyBindings;
 import org.graylog2.bootstrap.Main;
 import org.graylog2.bootstrap.ServerBootstrap;
 import org.graylog2.cluster.NodeService;
-import org.graylog2.configuration.ElasticsearchClientConfiguration;
 import org.graylog2.configuration.ElasticsearchConfiguration;
 import org.graylog2.configuration.EmailConfiguration;
 import org.graylog2.configuration.MongoDbConfiguration;
@@ -86,7 +84,6 @@ public class Server extends ServerBootstrap {
 
     private static final Configuration configuration = new Configuration();
     private final ElasticsearchConfiguration elasticsearchConfiguration = new ElasticsearchConfiguration();
-    private final ElasticsearchClientConfiguration elasticsearchClientConfiguration = new ElasticsearchClientConfiguration();
     private final EmailConfiguration emailConfiguration = new EmailConfiguration();
     private final MongoDbConfiguration mongoDbConfiguration = new MongoDbConfiguration();
     private final VersionCheckConfiguration versionCheckConfiguration = new VersionCheckConfiguration();
@@ -109,7 +106,6 @@ public class Server extends ServerBootstrap {
         modules.add(
             new ConfigurationModule(configuration),
             new ServerBindings(configuration),
-            new ElasticsearchModule(),
             new PersistenceServicesBindings(),
             new MessageFilterBindings(),
             new MessageProcessorModule(),
@@ -138,7 +134,6 @@ public class Server extends ServerBootstrap {
     protected List<Object> getCommandConfigurationBeans() {
         return Arrays.asList(configuration,
                 elasticsearchConfiguration,
-                elasticsearchClientConfiguration,
                 emailConfiguration,
                 mongoDbConfiguration,
                 versionCheckConfiguration,

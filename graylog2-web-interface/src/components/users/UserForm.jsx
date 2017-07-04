@@ -30,6 +30,7 @@ const UserForm = React.createClass({
     return {
       streams: undefined,
       dashboards: undefined,
+      roles: undefined,
       user: this._getUserStateFromProps(this.props),
     };
   },
@@ -54,6 +55,7 @@ const UserForm = React.createClass({
 
   _getUserStateFromProps(props) {
     return {
+      username: props.user.username,
       full_name: props.user.full_name,
       email: props.user.email,
       session_timeout_ms: props.user.session_timeout_ms,
@@ -61,7 +63,6 @@ const UserForm = React.createClass({
       permissions: props.user.permissions,
       read_only: props.user.read_only,
       external: props.user.external,
-      roles: props.user.roles,
     };
   },
 
@@ -106,7 +107,7 @@ const UserForm = React.createClass({
 
   _updateUser(evt) {
     evt.preventDefault();
-
+    console.log(this.props.user.username)
     UsersStore.update(this.props.user.username, this.state.user).then(() => {
       UserNotification.success('User updated successfully.', 'Success');
       if (this.isPermitted(this.state.currentUser.permissions, ['users:list'])) {
@@ -218,6 +219,11 @@ const UserForm = React.createClass({
                 </span>
               }
               <fieldset disabled={user.read_only}>
+                <Input name="username" id="username" type="text" maxLength={200} value={user.username}
+                       onChange={this._bindValue} labelClassName="col-sm-3" wrapperClassName="col-sm-9"
+                       label="Username" help="Give a descriptive name for this account, e.g. the user name."
+                       required />
+
                 <Input name="full_name" id="full_name" type="text" maxLength={200} value={user.full_name}
                        onChange={this._bindValue} labelClassName="col-sm-3" wrapperClassName="col-sm-9"
                        label="Full Name" help="Give a descriptive name for this account, e.g. the full name."

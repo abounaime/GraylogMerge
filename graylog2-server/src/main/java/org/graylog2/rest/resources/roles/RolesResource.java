@@ -16,6 +16,7 @@
  */
 package org.graylog2.rest.resources.roles;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -58,7 +59,6 @@ import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
@@ -86,7 +86,7 @@ public class RolesResource extends RestResource {
         final Set<Role> roles = roleService.loadAll();
         Set<RoleResponse> roleResponses = Sets.newHashSet();
         for (Role role : roles) {
-            roleResponses.add(RoleResponse.create(role.getName(), Optional.ofNullable(role.getDescription()), role.getPermissions(), role.isReadOnly()));
+            roleResponses.add(RoleResponse.create(role.getName(), Optional.fromNullable(role.getDescription()), role.getPermissions(), role.isReadOnly()));
         }
 
         return RolesResponse.create(roleResponses);
@@ -99,7 +99,7 @@ public class RolesResource extends RestResource {
         checkPermission(RestPermissions.ROLES_READ, name);
 
         final Role role = roleService.load(name);
-        return RoleResponse.create(role.getName(), Optional.ofNullable(role.getDescription()), role.getPermissions(), role.isReadOnly());
+        return RoleResponse.create(role.getName(), Optional.fromNullable(role.getDescription()), role.getPermissions(), role.isReadOnly());
     }
 
     @POST
@@ -114,7 +114,7 @@ public class RolesResource extends RestResource {
         Role role = new RoleImpl();
         role.setName(roleResponse.name());
         role.setPermissions(roleResponse.permissions());
-        role.setDescription(roleResponse.description().orElse(null));
+        role.setDescription(roleResponse.description().orNull());
 
         try {
             role = roleService.save(role);
@@ -128,7 +128,7 @@ public class RolesResource extends RestResource {
                 .build(role.getName());
 
         return Response.created(uri).entity(RoleResponse.create(role.getName(),
-                                                                Optional.ofNullable(role.getDescription()),
+                                                                Optional.fromNullable(role.getDescription()),
                                                                 role.getPermissions(),
                                                                 role.isReadOnly())).build();
     }
@@ -146,14 +146,14 @@ public class RolesResource extends RestResource {
             throw new BadRequestException("Cannot update read only role " + name);
         }
         roleToUpdate.setName(role.name());
-        roleToUpdate.setDescription(role.description().orElse(null));
+        roleToUpdate.setDescription(role.description().orNull());
         roleToUpdate.setPermissions(role.permissions());
         try {
             roleService.save(roleToUpdate);
         } catch (ValidationException e) {
             throw new BadRequestException(e);
         }
-        return RoleResponse.create(roleToUpdate.getName(), Optional.ofNullable(roleToUpdate.getDescription()), roleToUpdate.getPermissions(),
+        return RoleResponse.create(roleToUpdate.getName(), Optional.fromNullable(roleToUpdate.getDescription()), roleToUpdate.getPermissions(),
                                    role.readOnly());
     }
 

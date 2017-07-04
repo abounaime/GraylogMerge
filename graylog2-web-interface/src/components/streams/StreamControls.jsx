@@ -6,6 +6,8 @@ import StreamForm from './StreamForm';
 import PermissionsMixin from 'util/PermissionsMixin';
 
 import StoreProvider from 'injection/StoreProvider';
+import CombinedProvider from 'injection/CombinedProvider';
+const { StreamsStore } = CombinedProvider.get('Streams');
 const StartpageStore = StoreProvider.getStore('Startpage');
 
 const StreamControls = React.createClass({
@@ -46,13 +48,50 @@ const StreamControls = React.createClass({
     event.preventDefault();
     StartpageStore.set(this.props.user.username, 'stream', this.props.stream.id);
   },
+  addToFav(idStream,data){
+
+    if(idStream)
+      StreamsStore.addToFav(idStream,data)
+
+  },
+  removeFromFav(idStream,data){
+
+    if(idStream)
+      StreamsStore.modif(idStream,data)
+
+
+  },
   render() {
     const stream = this.props.stream;
+    var favoris
+    if(this.props.stream.isFavoriteStream){
+      favoris =<MenuItem key={`deleteStream-${stream.id}`} onSelect={
+        this.removeFromFav.bind(this,this.props.stream.id,{
+          title : this.props.stream.title,
+          description : this.props.stream.description,
+          remove_matches_from_default_stream :this.props.stream.remove_matches_from_default_stream,
+          isFavoriteStream : this.props.stream.isFavoriteStream,
+          index_set_id : this.props.stream.index_set_id,
+        })}>
+        Remove from to favorites
+      </MenuItem>}
+    else {
+    favoris =<MenuItem key={`deleteStream-${stream.id}`} onSelect={
+      this.addToFav.bind(this,this.props.stream.id,{
+        title : this.props.stream.title,
+        description : this.props.stream.description,
+        remove_matches_from_default_stream :this.props.stream.remove_matches_from_default_stream,
+        isFavoriteStream : this.props.stream.isFavoriteStream,
+        index_set_id : this.props.stream.index_set_id,
+      })}>
+      Add to favorites
+    </MenuItem>}
 
     return (
       <span>
         <DropdownButton title="More Actions" ref="dropdownButton" pullRight
                         id={`more-actions-dropdown-${stream.id}`} disabled={this.props.isDefaultStream}>
+          {favoris}
           <IfPermitted permissions={`streams:edit:${stream.id}`}>
             <MenuItem key={`editStreams-${stream.id}`} onSelect={this._onEdit}>Edit stream</MenuItem>
           </IfPermitted>
@@ -73,6 +112,7 @@ const StreamControls = React.createClass({
               Delete this stream
             </MenuItem>
           </IfPermitted>
+
         </DropdownButton>
         <StreamForm ref="streamForm" title="Editing Stream" onSubmit={this.props.onUpdate} stream={stream} indexSets={this.props.indexSets} />
         <StreamForm ref="cloneForm" title="Cloning Stream" onSubmit={this._onCloneSubmit} indexSets={this.props.indexSets} />

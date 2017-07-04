@@ -1,5 +1,11 @@
 import React from 'react';
 import ReactSelect from 'react-select';
+import Reflux from 'reflux';
+import ActionsProvider from 'injection/ActionsProvider';
+const UsersAndStreamsActions = ActionsProvider.getActions('UsersAndStreams');
+const UsersStore = StoreProvider.getStore('Users');
+import StoreProvider from 'injection/StoreProvider';
+
 
 const propTypes = ReactSelect.propTypes;
 propTypes.onValueChange = React.PropTypes.func;
@@ -38,12 +44,18 @@ const Select = React.createClass({
     // As someone said: "This can't do any more harm that we already do"
     this.refs.select.clearValue(new CustomEvent('fake'));
   },
+
+
+
   _onChange(value) {
-    this.setState({ value: value });
+
+    this.setState({value: value});
 
     if (this.props.onValueChange) {
       this.props.onValueChange(value);
     }
+
+
   },
   reactSelectStyles: require('!style/useable!css!react-select/dist/default.css'),
   reactSelectSmStyles: require('!style/useable!css!./Select.css'),
@@ -51,11 +63,16 @@ const Select = React.createClass({
     // eslint-disable-next-line no-unused-vars
     const { onValueChange, size, ...reactSelectProps } = this.props;
 
+
+
     return (
       <div className={size === 'small' ? 'select-sm' : ''}>
-        <ReactSelect ref="select" onChange={this._onChange} {...reactSelectProps} value={this.state.value} />
+        <ReactSelect ref="select" onChange={this._onChange} {...reactSelectProps} value={this.state.value}
+
+        />
       </div>
     );
+
   },
 });
 

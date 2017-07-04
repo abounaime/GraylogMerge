@@ -1,6 +1,5 @@
 import React from 'react';
 import numeral from 'numeral';
-import TimeHelper from 'util/TimeHelper';
 
 const CounterRate = React.createClass({
   propTypes: {
@@ -25,15 +24,19 @@ const CounterRate = React.createClass({
     return {
       prevMetric: null,
       prevTs: null,
-      nowTs: TimeHelper.nowInSeconds(),
+      nowTs: this._nowInSeconds(),
     };
   },
   componentWillReceiveProps() {
     this.setState({
       prevMetric: this.props.metric,
       prevTs: this.state.nowTs,
-      nowTs: TimeHelper.nowInSeconds(),
+      nowTs: this._nowInSeconds(),
     });
+  },
+
+  _nowInSeconds() {
+    return Math.floor(Date.now() / 1000);
   },
 
   _checkPrevMetric() {

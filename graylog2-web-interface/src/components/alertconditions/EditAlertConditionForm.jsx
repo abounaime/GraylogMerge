@@ -4,11 +4,9 @@ import { Button } from 'react-bootstrap';
 
 import { EntityList, Spinner } from 'components/common';
 import { AlertConditionForm, AlertConditionSummary } from 'components/alertconditions';
-import PermissionsMixin from 'util/PermissionsMixin';
 
 import CombinedProvider from 'injection/CombinedProvider';
 const { AlertConditionsActions, AlertConditionsStore } = CombinedProvider.get('AlertConditions');
-const { CurrentUserStore } = CombinedProvider.get('CurrentUser');
 
 const EditAlertConditionForm = React.createClass({
   propTypes: {
@@ -16,7 +14,7 @@ const EditAlertConditionForm = React.createClass({
     stream: React.PropTypes.object.isRequired,
   },
 
-  mixins: [Reflux.connect(AlertConditionsStore), Reflux.connect(CurrentUserStore), PermissionsMixin],
+  mixins: [Reflux.connect(AlertConditionsStore)],
 
   _onEdit() {
     this.refs.updateForm.open();
@@ -34,13 +32,9 @@ const EditAlertConditionForm = React.createClass({
     const condition = this.props.alertCondition;
     const typeDefinition = this.state.types[type];
 
-    const permissions = this.state.currentUser.permissions;
-    let actions = [];
-    if (this.isPermitted(permissions, `streams:edit:${stream.id}`)) {
-      actions = [
-        <Button key="edit-button" bsStyle="info" onClick={this._onEdit}>Edit</Button>,
-      ];
-    }
+    const actions = [
+      <Button key="edit-button" bsStyle="info" onClick={this._onEdit}>Edit</Button>,
+    ];
 
     return [
       <AlertConditionSummary key={`alert-condition-${condition.id}`} alertCondition={condition}

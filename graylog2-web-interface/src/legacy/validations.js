@@ -1,8 +1,6 @@
+require('!script!../../public/javascripts/jquery-2.1.1.min.js');
+require('!script!../../public/javascripts/bootstrap.min.js');
 import DateTime from 'logic/datetimes/DateTime';
-import $ from 'jquery';
-global.jQuery = $;
-require('bootstrap/js/tooltip');
-require('bootstrap/js/popover');
 
 export function validate(formContainer) {
   let errors = false;

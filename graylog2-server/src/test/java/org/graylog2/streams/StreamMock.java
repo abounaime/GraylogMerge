@@ -53,7 +53,7 @@ public class StreamMock implements Stream {
     private boolean defaultStream;
     private boolean removeMatchesFromDefaultStream;
     private IndexSet indexSet;
-
+    private Boolean favoriteStream;
     public StreamMock(Map<String, Object> stream) {
         this(stream, Collections.emptyList());
     }
@@ -200,9 +200,19 @@ public class StreamMock implements Stream {
     }
 
     @Override
+    public Boolean isFavoriteStream() {
+        return favoriteStream;
+    }
+    @Override
     public void setDefaultStream(boolean defaultStream) {
         this.defaultStream = defaultStream;
     }
+
+    @Override
+    public void setFavoriteStream(Boolean defaultStream) {
+        this.favoriteStream = favoriteStream;
+    }
+
 
     @Override
     public boolean getRemoveMatchesFromDefaultStream() {

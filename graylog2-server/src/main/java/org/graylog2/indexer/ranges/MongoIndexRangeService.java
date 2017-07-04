@@ -30,16 +30,18 @@ import com.google.common.primitives.Ints;
 import com.mongodb.BasicDBObject;
 import com.mongodb.BasicDBObjectBuilder;
 import org.bson.types.ObjectId;
+import org.elasticsearch.indices.IndexClosedException;
 import org.graylog2.audit.AuditActor;
 import org.graylog2.audit.AuditEventSender;
 import org.graylog2.bindings.providers.MongoJackObjectMapperProvider;
 import org.graylog2.database.MongoConnection;
 import org.graylog2.database.NotFoundException;
 import org.graylog2.indexer.IndexSetRegistry;
+import org.graylog2.indexer.esplugin.IndexChangeMonitor;
+import org.graylog2.indexer.esplugin.IndicesClosedEvent;
+import org.graylog2.indexer.esplugin.IndicesDeletedEvent;
+import org.graylog2.indexer.esplugin.IndicesReopenedEvent;
 import org.graylog2.indexer.indices.Indices;
-import org.graylog2.indexer.indices.events.IndicesClosedEvent;
-import org.graylog2.indexer.indices.events.IndicesDeletedEvent;
-import org.graylog2.indexer.indices.events.IndicesReopenedEvent;
 import org.graylog2.indexer.searches.IndexRangeStats;
 import org.graylog2.plugin.system.NodeId;
 import org.joda.time.DateTime;
@@ -87,6 +89,8 @@ public class MongoIndexRangeService implements IndexRangeService {
             ObjectId.class,
             objectMapperProvider.get());
 
+        // This sucks. We need to bridge Elasticsearch's and our own Guice injector.
+        IndexChangeMonitor.setEventBus(eventBus);
         eventBus.register(this);
 
         collection.createIndex(new BasicDBObject(MongoIndexRange.FIELD_INDEX_NAME, 1));
@@ -209,15 +213,25 @@ public class MongoIndexRangeService implements IndexRangeService {
 
             indices.waitForRecovery(index);
 
+            final Retryer<IndexRange> retryer = RetryerBuilder.<IndexRange>newBuilder()
+                .retryIfException(input -> !(input instanceof IndexClosedException))
+                .withWaitStrategy(WaitStrategies.exponentialWait())
+                .withStopStrategy(StopStrategies.stopAfterDelay(5, TimeUnit.MINUTES))
+                .build();
+
             final IndexRange indexRange;
             try {
-                indexRange = calculateRange(index);
+                indexRange = retryer.call(() -> calculateRange(index));
                 auditEventSender.success(AuditActor.system(nodeId), ES_INDEX_RANGE_CREATE, ImmutableMap.of("index_name", index));
             } catch (Exception e) {
-                final String message = "Couldn't calculate index range for index \"" + index + "\"";
-                LOG.error(message, e);
+                if (e.getCause() instanceof IndexClosedException) {
+                    LOG.debug("Couldn't calculate index range for closed index \"" + index + "\"", e.getCause());
+                    auditEventSender.failure(AuditActor.system(nodeId), ES_INDEX_RANGE_CREATE, ImmutableMap.of("index_name", index));
+                    return;
+                }
+                LOG.error("Couldn't calculate index range for index \"" + index + "\"", e.getCause());
                 auditEventSender.failure(AuditActor.system(nodeId), ES_INDEX_RANGE_CREATE, ImmutableMap.of("index_name", index));
-                throw new RuntimeException(message, e);
+                throw new RuntimeException("Couldn't calculate index range for index \"" + index + "\"", e);
             }
 
             save(indexRange);

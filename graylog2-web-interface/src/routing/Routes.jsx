@@ -43,6 +43,7 @@ PluginStore.exports('routes').forEach((pluginRoute) => {
 
 const Routes = {
   STARTPAGE: '/',
+  HOME: '/home',
   SEARCH: '/search',
   STREAMS: '/streams',
   ALERTS: {
@@ -54,6 +55,7 @@ const Routes = {
   },
   SOURCES: '/sources',
   DASHBOARDS: '/dashboards',
+  USERSANDSTREAMS: '/UsersAndStreams',
   GETTING_STARTED: '/gettingstarted',
   SYSTEM: {
     CONFIGURATIONS: '/system/configurations',
@@ -99,24 +101,6 @@ const Routes = {
         provider: name => `/system/authentication/config/${name}`,
       },
     },
-    LOOKUPTABLES: {
-      OVERVIEW: '/system/lookuptables',
-      CREATE: '/system/lookuptables/create',
-      show: tableName => `/system/lookuptables/table/${tableName}`,
-      edit: tableName => `/system/lookuptables/table/${tableName}/edit`,
-      CACHES: {
-        OVERVIEW: '/system/lookuptables/caches',
-        CREATE: '/system/lookuptables/caches/create',
-        show: cacheName => `/system/lookuptables/caches/${cacheName}`,
-        edit: cacheName => `/system/lookuptables/caches/${cacheName}/edit`,
-      },
-      DATA_ADAPTERS: {
-        OVERVIEW: '/system/lookuptables/data_adapters',
-        CREATE: '/system/lookuptables/data_adapters/create',
-        show: adapterName => `/system/lookuptables/data_adapter/${adapterName}`,
-        edit: adapterName => `/system/lookuptables/data_adapter/${adapterName}/edit`,
-      },
-    },
   },
   search_with_query: (query, rangeType, timeRange) => {
     const route = new URI(Routes.SEARCH);
@@ -130,6 +114,7 @@ const Routes = {
     return route.resource();
   },
   _common_search_url: (resource, query, timeRange, resolution) => {
+
     const route = new URI(resource);
     const queryParams = {
       q: query,
@@ -153,7 +138,9 @@ const Routes = {
   stream_edit_example: (streamId, index, messageId) => `${Routes.stream_edit(streamId)}?index=${index}&message_id=${messageId}`,
   stream_outputs: streamId => `/streams/${streamId}/outputs`,
   stream_search: (streamId, query, timeRange, resolution) => {
+
     return Routes._common_search_url(`${Routes.STREAMS}/${streamId}/search`, query, timeRange, resolution);
+
   },
   legacy_stream_search: streamId => `/streams/${streamId}/messages`,
 

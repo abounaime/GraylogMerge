@@ -50,7 +50,7 @@ const IndexSetCreationPage = React.createClass({
   },
 
   componentDidMount() {
-    IndicesConfigurationActions.loadRotationStrategies();
+   IndicesConfigurationActions.loadRotationStrategies();
     IndicesConfigurationActions.loadRetentionStrategies();
   },
 

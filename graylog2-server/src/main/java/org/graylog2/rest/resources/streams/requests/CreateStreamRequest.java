@@ -58,14 +58,18 @@ public abstract class CreateStreamRequest {
     @JsonProperty("index_set_id")
     public abstract String indexSetId();
 
+    @JsonProperty("favorite_stream")
+    public abstract boolean favoriteStream();
+
     @JsonCreator
     public static CreateStreamRequest create(@JsonProperty("title") @NotEmpty String title,
                                              @JsonProperty("description") @Nullable String description,
                                              @JsonProperty("rules") @Nullable List<CreateStreamRuleRequest> rules,
                                              @JsonProperty("content_pack") @Nullable String contentPack,
                                              @JsonProperty("matching_type") @Nullable String matchingType,
-                                             @JsonProperty("remove_matches_from_default_stream") @Nullable Boolean removeMatchesFromDefaultStream,
-                                             @JsonProperty("index_set_id") String indexSetId) {
+                                             @JsonProperty("remove_matches_from_default_stream") @Nullable boolean removeMatchesFromDefaultStream,
+                                             @JsonProperty("index_set_id") String indexSetId,
+                                             @JsonProperty("isFavoriteStream") boolean favoriteStream) {
         return new AutoValue_CreateStreamRequest(
                 title,
                 description,
@@ -73,7 +77,8 @@ public abstract class CreateStreamRequest {
                 contentPack,
                 Stream.MatchingType.valueOfOrDefault(matchingType),
                 firstNonNull(removeMatchesFromDefaultStream, false),
-                indexSetId
+                indexSetId,
+                favoriteStream
         );
     }
 }

@@ -51,13 +51,18 @@ public abstract class UpdateStreamRequest {
     @Nullable
     public abstract String indexSetId();
 
+    @JsonProperty("isFavoriteStream")
+    public abstract Boolean favoriteStream();
+
     @JsonCreator
     public static UpdateStreamRequest create(@JsonProperty("title") @Nullable String title,
                                              @JsonProperty("description") @Nullable String description,
                                              @JsonProperty("matching_type") @Nullable String matchingType,
                                              @JsonProperty("rules") @Nullable List rules,
                                              @JsonProperty("remove_matches_from_default_stream") @Nullable Boolean removeMatchesFromDefaultStream,
-                                             @JsonProperty("index_set_id") @Nullable String indexSetId) {
-        return new AutoValue_UpdateStreamRequest(title, description, matchingType, removeMatchesFromDefaultStream, indexSetId);
+                                             @JsonProperty("index_set_id") @Nullable String indexSetId,
+                                             @JsonProperty("isFavoriteStream")  Boolean favoriteStream
+    ) {
+        return new AutoValue_UpdateStreamRequest(title, description, matchingType, removeMatchesFromDefaultStream, indexSetId, favoriteStream);
     }
 }

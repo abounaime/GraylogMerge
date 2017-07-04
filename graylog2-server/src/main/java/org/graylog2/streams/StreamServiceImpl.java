@@ -139,6 +139,7 @@ public class StreamServiceImpl extends PersistedServiceImpl implements StreamSer
         streamData.put(StreamImpl.FIELD_MATCHING_TYPE, cr.matchingType().toString());
         streamData.put(StreamImpl.FIELD_REMOVE_MATCHES_FROM_DEFAULT_STREAM, cr.removeMatchesFromDefaultStream());
         streamData.put(StreamImpl.FIELD_INDEX_SET_ID, cr.indexSetId());
+        streamData.put(StreamImpl.FIELD_FAVORITE_STREAM, cr.favoriteStream());
 
         return create(streamData);
     }

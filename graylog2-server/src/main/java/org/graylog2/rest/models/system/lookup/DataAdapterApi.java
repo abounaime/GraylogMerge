@@ -51,10 +51,6 @@ public abstract class DataAdapterApi {
     @NotEmpty
     public abstract String name();
 
-    @JsonProperty("content_pack")
-    @Nullable
-    public abstract String contentPack();
-
     @JsonProperty("config")
     @NotNull
     public abstract LookupDataAdapterConfiguration config();
@@ -69,7 +65,6 @@ public abstract class DataAdapterApi {
                 .title(dto.title())
                 .description(dto.description())
                 .name(dto.name())
-                .contentPack(dto.contentPack())
                 .config(dto.config())
                 .build();
     }
@@ -80,7 +75,6 @@ public abstract class DataAdapterApi {
                 .title(title())
                 .description(description())
                 .name(name())
-                .contentPack(contentPack())
                 .config(config())
                 .build();
     }
@@ -98,9 +92,6 @@ public abstract class DataAdapterApi {
 
         @JsonProperty("name")
         public abstract Builder name(String name);
-
-        @JsonProperty("content_pack")
-        public abstract Builder contentPack(@Nullable String contentPack);
 
         @JsonProperty("config")
         public abstract Builder config(LookupDataAdapterConfiguration config);

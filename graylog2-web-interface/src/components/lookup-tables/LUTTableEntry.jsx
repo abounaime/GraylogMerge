@@ -6,9 +6,6 @@ import CombinedProvider from 'injection/CombinedProvider';
 
 import Routes from 'routing/Routes';
 
-import { ErrorPopover } from 'components/lookup-tables';
-import { ContentPackMarker } from 'components/common';
-
 const { LookupTablesActions } = CombinedProvider.get('LookupTables');
 
 const LUTTableEntry = React.createClass({
@@ -17,17 +14,6 @@ const LUTTableEntry = React.createClass({
     table: React.PropTypes.object.isRequired,
     cache: React.PropTypes.object.isRequired,
     dataAdapter: React.PropTypes.object.isRequired,
-    errors: React.PropTypes.object,
-  },
-
-  getDefaultProps() {
-    return {
-      errors: {
-        table: null,
-        cache: null,
-        dataAdapter: null,
-      },
-    };
   },
 
   _onDelete() {
@@ -36,23 +22,18 @@ const LUTTableEntry = React.createClass({
       LookupTablesActions.delete(this.props.table.id).then(() => LookupTablesActions.reloadPage());
     }
   },
-
   render() {
     return (<tbody>
       <tr>
         <td>
-          {this.props.errors.table && (<ErrorPopover placement="right" errorText={this.props.errors.table} title="Lookup Table problem" />) }
           <LinkContainer to={Routes.SYSTEM.LOOKUPTABLES.show(this.props.table.name)}><a>{this.props.table.title}</a></LinkContainer>
-          <ContentPackMarker contentPack={this.props.table.content_pack} marginLeft={5} />
         </td>
         <td>{this.props.table.description}</td>
         <td>{this.props.table.name}</td>
         <td>
-          {this.props.errors.cache && (<ErrorPopover placement="bottom" errorText={this.props.errors.cache} title="Cache problem" />) }
           <LinkContainer to={Routes.SYSTEM.LOOKUPTABLES.CACHES.show(this.props.cache.name)}><a>{this.props.cache.title}</a></LinkContainer>
         </td>
         <td>
-          {this.props.errors.dataAdapter && (<ErrorPopover placement="bottom" errorText={this.props.errors.dataAdapter} title="Data adapter problem" />) }
           <LinkContainer to={Routes.SYSTEM.LOOKUPTABLES.DATA_ADAPTERS.show(this.props.dataAdapter.name)}><a>{this.props.dataAdapter.title}</a></LinkContainer>
         </td>
         <td>

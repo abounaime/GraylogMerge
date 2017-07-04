@@ -1,6 +1,7 @@
-import $ from 'jquery';
+// / <reference path="../../../declarations/jquery/jquery.d.ts" />
 
 let initialized = false;
+/* global $ */
 
 const UniversalSearch = {
   init() {

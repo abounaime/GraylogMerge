@@ -1,16 +1,24 @@
 import $ from 'jquery';
+import Reflux from 'reflux';
+const { StreamsStore } = CombinedProvider.get('Streams');
+import CombinedProvider from 'injection/CombinedProvider';
+
 import React from 'react';
 import ReactDOM from 'react-dom';
 import Immutable from 'immutable';
 import { Button, ButtonToolbar, DropdownButton, MenuItem, Alert } from 'react-bootstrap';
 import URI from 'urijs';
+import SelectStreamsUsers from 'components/common/SelectStreamsUsers.jsx';
+import { LinkContainer } from 'react-router-bootstrap';
+import Routes from 'routing/Routes';
 
 import { Input } from 'components/bootstrap';
 import { DatePicker, Select } from 'components/common';
 import { RefreshControls, QueryInput } from 'components/search';
 import DocumentationLink from 'components/support/DocumentationLink';
 import DocsHelper from 'util/DocsHelper';
-
+const UsersAndStreamsStore = StoreProvider.getStore('UsersAndStreams');
+const StreamRulesStore = StoreProvider.getStore('StreamRules');
 import StoreProvider from 'injection/StoreProvider';
 const SearchStore = StoreProvider.getStore('Search');
 const ToolsStore = StoreProvider.getStore('Tools');
@@ -31,10 +39,15 @@ const SearchBar = React.createClass({
     displayRefreshControls: React.PropTypes.bool,
     onExecuteSearch: React.PropTypes.func,
   },
+  mixins: [
+    Reflux.connect(UsersAndStreamsStore),
 
+  ],
   getDefaultProps() {
     return {
       displayRefreshControls: true,
+      streamsTitleList:  [{}],
+
     };
   },
 
@@ -46,9 +59,11 @@ const SearchBar = React.createClass({
       query: this.initialSearchParams.query,
       savedSearch: SearchStore.savedSearch,
       keywordPreview: Immutable.Map(),
+      rulesNameStream : ""
     };
   },
   componentDidMount() {
+    this.loadStreamsTitleList();
     SearchStore.onParamsChanged = newParams => this.setState(newParams);
     SearchStore.onSubmitSearch = () => {
       this._performSearch();
@@ -66,6 +81,7 @@ const SearchBar = React.createClass({
   },
   reload() {
     this.setState(this.getInitialState());
+
   },
   _initializeSearchQueryInput() {
     if (this.props.userPreferences.enableSmartSearch) {
@@ -213,6 +229,7 @@ const SearchBar = React.createClass({
     if (typeof this.props.onExecuteSearch === 'function') {
       this.props.onExecuteSearch(resource);
     }
+    this._initializeSearchQueryInput();
   },
   _onSavedSearchSelect(searchId) {
     if (searchId === '') {
@@ -376,89 +393,241 @@ const SearchBar = React.createClass({
     );
   },
 
+  loadStreamsTitleList() {
+    var listeStreams=StreamsStore.listStreamsForAllUsers().then((response) => {
+      this.setState({
+        streamsTitleList: response.map(function (stream) {
+          return { value : stream.id , label : stream.title }
+        })
+      });
+    });
+
+  },
+
+loadStreamsRule(){
+  //this.setState({rulesNameStream : ""})
+ // console.log("exeeeeeeeeeeeeeeeec")
+  //this.getInitialState()
+  //console.log("rules!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: "+this.state.rulesNameStream)
+
+  if(this.state.idStreamStore) {
+    var ids = this.state.idStreamStore
+    var tab = ids.split(',')
+    for (var i = 0; i < tab.length; i++) {
+      StreamRulesStore.list(tab[i], this.callback)
+
+    }
+  }
+},
+  callback(streamRules){
+
+    var rules=streamRules["stream_rules"]
+    var arr_rules=[]
+     for(var i=0; i<rules.length; i++){
+       arr_rules.push( (rules[i]["value"]))
+     }
+  //  this.setState({rulesNameStream : this.state.rulesNameStream+arr_rules})
+  },
+
+  requete(){
+    if(this.state.idStreamStore){
+    var ids=this.state.idStreamStore
+    var tab=ids.split(',')
+    var requete=""
+    for(var i=0;i<tab.length;i++){
+      requete =tab[i]+" , "+requete
+
+    }
+      //this.setState({rulesNameStream : ""})
+     // this.loadStreamsRule()
+  //    console.log("rules: "+this.state.rulesNameStream)
+
+      return requete}
+    else
+
+
+    return this.state.query
+  },
+
   render() {
-    return (
-      <div className="row no-bm">
-        <div className="col-md-12" id="universalsearch-container">
-          <div className="row no-bm">
-            <div ref="universalSearch" className="col-md-12" id="universalsearch">
-              <form ref="searchForm"
-                    className="universalsearch-form"
-                    action={SearchStore.searchBaseLocation('index')}
-                    method="GET"
-                    onSubmit={this._performSearch}>
-                <input type="hidden" name="rangetype" value={this.state.rangeType} />
-                <input type="hidden" ref={(ref) => { this.fields = ref; }} name="fields" value="" />
-                <input type="hidden" ref={(ref) => { this.width = ref; }} name="width" value="" />
-                <input type="hidden" ref={(ref) => { this.highlightMessage = ref; }} name="highlightMessage" value="" />
+    console.log(this.requete())
+    var URL = window.location.href;
+    var urlModifie=URL.split('/')
+    var taille=urlModifie.length
+    let lien
+    if(URL === "http://"+urlModifie[taille-2]+"/home")
+      lien="Home"
+    else
+      lien ="notHome"
+    if(lien ==="notHome"){
 
-                <div className="timerange-selector-container">
-                  <div className="row no-bm">
-                    <div className="col-md-6">
-                      <ButtonToolbar className="timerange-chooser pull-left">
-                        <DropdownButton bsStyle="info"
-                                        title={<i className="fa fa-clock-o" />}
-                                        onSelect={this._rangeTypeChanged}
-                                        id="dropdown-timerange-selector">
-                          <MenuItem eventKey="relative"
-                                    className={this.state.rangeType === 'relative' ? 'selected' : null}>
-                            Relative
-                          </MenuItem>
-                          <MenuItem eventKey="absolute"
-                                    className={this.state.rangeType === 'absolute' ? 'selected' : null}>
-                            Absolute
-                          </MenuItem>
-                          <MenuItem eventKey="keyword"
-                                    className={this.state.rangeType === 'keyword' ? 'selected' : null}>
-                            Keyword
-                          </MenuItem>
-                        </DropdownButton>
-                      </ButtonToolbar>
+      return (
+        <div className="row no-bm">
+          <div className="col-md-12" id="universalsearch-container">
+            <div className="row no-bm">
+              <div ref="universalSearch" className="col-md-12" id="universalsearch">
+                <form ref="searchForm"
+                      className="universalsearch-form"
+                      action={SearchStore.searchBaseLocation('index')}
+                      method="GET"
+                      onSubmit={this._performSearch}>
+                  <input type="hidden" name="rangetype" value={this.state.rangeType} />
+                  <input type="hidden" ref={(ref) => { this.fields = ref; }} name="fields" value="" />
+                  <input type="hidden" ref={(ref) => { this.width = ref; }} name="width" value="" />
+                  <input type="hidden" ref={(ref) => { this.highlightMessage = ref; }} name="highlightMessage" value="" />
 
-                      {this._getRangeTypeSelector()}
-                    </div>
-                    <div className="col-md-6">
-                      <div className="saved-searches-selector-container pull-right"
-                           style={{ display: 'inline-flex', marginRight: 5 }}>
-                        {this.props.displayRefreshControls &&
-                        <div style={{ marginRight: 5 }}>
-                          <RefreshControls />
-                        </div>
-                        }
-                        <div style={{ width: 270 }}>
-                          {this._getSavedSearchesSelector()}
+                  <div className="timerange-selector-container">
+                    <div className="row no-bm">
+                      <div className="col-md-6">
+                        <ButtonToolbar className="timerange-chooser pull-left">
+                          <DropdownButton bsStyle="info"
+                                          title={<i className="fa fa-clock-o" />}
+                                          onSelect={this._rangeTypeChanged}
+                                          id="dropdown-timerange-selector">
+                            <MenuItem eventKey="relative"
+                                      className={this.state.rangeType === 'relative' ? 'selected' : null}>
+                              Relative
+                            </MenuItem>
+                            <MenuItem eventKey="absolute"
+                                      className={this.state.rangeType === 'absolute' ? 'selected' : null}>
+                              Absolute
+                            </MenuItem>
+                            <MenuItem eventKey="keyword"
+                                      className={this.state.rangeType === 'keyword' ? 'selected' : null}>
+                              Keyword
+                            </MenuItem>
+                          </DropdownButton>
+                        </ButtonToolbar>
+
+                        {this._getRangeTypeSelector()}
+                      </div>
+                      <div className="col-md-6">
+                        <div className="saved-searches-selector-container pull-right"
+                             style={{ display: 'inline-flex', marginRight: 5 }}>
+                          {this.props.displayRefreshControls &&
+                          <div style={{ marginRight: 5 }}>
+                            <RefreshControls />
+                          </div>
+                          }
+                          <div style={{ width: 270 }}>
+                            {this._getSavedSearchesSelector()}
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div id="search-container">
-                  <div className="pull-right search-help">
-                    <DocumentationLink page={DocsHelper.PAGES.SEARCH_QUERY_LANGUAGE}
-                                       title="Search query syntax documentation"
-                                       text={<i className="fa fa-lightbulb-o" />} />
+                  <div id="search-container">
+                    <div className="pull-right search-help">
+                      <DocumentationLink page={DocsHelper.PAGES.SEARCH_QUERY_LANGUAGE}
+                                         title="Search query syntax documentation"
+                                         text={<i className="fa fa-lightbulb-o" />} />
+                    </div>
+
+                    <Button type="submit" bsStyle="success" className="pull-left">
+                      <i className="fa fa-search" />
+                    </Button>
+
+                    <div className="query">
+                      <Input type="text"
+                             ref="query"
+                             name="q"
+                             value={this.state.query}
+                             onChange={this._queryChanged}
+                             placeholder="Type your search query here and press enter. (&quot;not found&quot; AND http) OR http_response_code:[400 TO 404]" />
+                    </div>
                   </div>
-
-                  <Button type="submit" bsStyle="success" className="pull-left">
-                    <i className="fa fa-search" />
-                  </Button>
-
-                  <div className="query">
-                    <Input type="text"
-                           ref="query"
-                           name="q"
-                           value={this.state.query}
-                           onChange={this._queryChanged}
-                           placeholder="Type your search query here and press enter. (&quot;not found&quot; AND http) OR http_response_code:[400 TO 404]" />
-                  </div>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    );
+      );}
+    if(lien==="Home"){
+
+      return(
+        <div>
+
+          <div className="row no-bm">
+            <div className="col-md-12" id="universalsearch-container">
+              <div className="row no-bm">
+                <div ref="universalSearch" className="col-md-12" id="universalsearch">
+                  <label htmlfor="name">Applications</label>
+
+                  <SelectStreamsUsers
+                    name="form-field-name"
+                    value=""
+                    options={this.state.streamsTitleList}
+                    multi ={true}
+                    placeholder= "Type/Select an application"
+                  />
+                  <form ref="searchForm"
+                        className="universalsearch-form"
+                        action={SearchStore.searchBaseLocation('index')}
+                        method="GET"
+                        onSubmit={this._performSearch}>
+                    <input type="hidden" name="rangetype" value={this.state.rangeType} />
+                    <input type="hidden" ref={(ref) => { this.fields = ref; }} name="fields" value="" />
+                    <input type="hidden" ref={(ref) => { this.width = ref; }} name="width" value="" />
+                    <input type="hidden" ref={(ref) => { this.highlightMessage = ref; }} name="highlightMessage" value="" />
+
+                    <div className="timerange-selector-container">
+                      <div className="row no-bm">
+                        <div className="col-md-6">
+                          <ButtonToolbar className="timerange-chooser pull-left">
+                            <DropdownButton bsStyle="info"
+                                            title={<i className="fa fa-clock-o" />}
+                                            onSelect={this._rangeTypeChanged}
+                                            id="dropdown-timerange-selector">
+                              <MenuItem eventKey="relative"
+                                        className={this.state.rangeType === 'relative' ? 'selected' : null}>
+                                Relative
+                              </MenuItem>
+                              <MenuItem eventKey="absolute"
+                                        className={this.state.rangeType === 'absolute' ? 'selected' : null}>
+                                Absolute
+                              </MenuItem>
+                              <MenuItem eventKey="keyword"
+                                        className={this.state.rangeType === 'keyword' ? 'selected' : null}>
+                                Keyword
+                              </MenuItem>
+                            </DropdownButton>
+                          </ButtonToolbar>
+
+                          {this._getRangeTypeSelector()}
+                        </div>
+
+                      </div>
+                    </div>
+
+                    <div id="search-container">
+
+
+                      <Button type="submit" bsStyle="success" className="pull-left">
+                        <i className="fa fa-search" />
+                      </Button>
+
+                      <div className="query"><Input type="text"
+                                                    ref="query"
+                                                    name="q"
+                        value={this.state.query}
+                                                 //   value={this.requete()}
+                                                    onChange={this._queryChanged}
+                                                    placeholder="Type your search query here and press enter. (&quot;not found&quot; AND http) OR http_response_code:[400 TO 404]" />
+                      </div>
+
+                    </div>
+                  </form>
+
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
   },
 });
 

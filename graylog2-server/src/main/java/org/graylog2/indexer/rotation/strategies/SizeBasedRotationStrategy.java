@@ -19,6 +19,7 @@ package org.graylog2.indexer.rotation.strategies;
 
 import org.graylog2.audit.AuditEventSender;
 import org.graylog2.indexer.IndexSet;
+import org.graylog2.indexer.indices.IndexStatistics;
 import org.graylog2.indexer.indices.Indices;
 import org.graylog2.plugin.indexer.rotation.RotationStrategyConfig;
 import org.graylog2.plugin.system.NodeId;
@@ -27,7 +28,6 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.text.MessageFormat;
 import java.util.Locale;
-import java.util.Optional;
 
 public class SizeBasedRotationStrategy extends AbstractRotationStrategy {
     private final Indices indices;
@@ -59,12 +59,13 @@ public class SizeBasedRotationStrategy extends AbstractRotationStrategy {
 
         final SizeBasedRotationStrategyConfig config = (SizeBasedRotationStrategyConfig) indexSet.getConfig().rotationStrategy();
 
-        final Optional<Long> storeSizeInBytes = indices.getStoreSizeInBytes(index);
-        if (!storeSizeInBytes.isPresent()) {
+        final IndexStatistics indexStats = indices.getIndexStats(index);
+        if (indexStats == null) {
             return null;
         }
 
-        final long sizeInBytes = storeSizeInBytes.get();
+        final long sizeInBytes = indexStats.primaries().getStore().getSizeInBytes();
+
         final boolean shouldRotate = sizeInBytes > config.maxSize();
 
         return new Result() {
@@ -74,7 +75,7 @@ public class SizeBasedRotationStrategy extends AbstractRotationStrategy {
             @Override
             public String getDescription() {
                 MessageFormat format = shouldRotate() ? ROTATE : NOT_ROTATE;
-                return format.format(new Object[]{
+                return format.format(new Object[] {
                         index,
                         sizeInBytes,
                         config.maxSize()

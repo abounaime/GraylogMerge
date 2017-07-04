@@ -76,7 +76,7 @@ const TypeAheadFieldInput = React.createClass({
 
   render() {
     return (
-      <Input ref="fieldInput" label={this.props.label}
+      <Input ref="fieldInput"
              wrapperClassName="typeahead-wrapper"
              defaultValue={this.props.valueLink ? this.props.valueLink.value : null}
         {...this._getFilteredProps()} />

@@ -9,7 +9,6 @@ import {
   RegexReplaceExtractorConfiguration,
   SplitAndIndexExtractorConfiguration,
   SubstringExtractorConfiguration,
-  LookupTableExtractorConfiguration,
 } from 'components/extractors/extractors_configuration';
 
 import ExtractorUtils from 'util/ExtractorUtils';
@@ -83,14 +82,6 @@ const EditExtractorConfiguration = React.createClass({
                                              onChange={this.props.onChange}
                                              onExtractorPreviewLoad={this._onExtractorPreviewLoad} />
       );
-        break;
-      case ExtractorUtils.ExtractorTypes.LOOKUP_TABLE:
-        extractorConfiguration = (
-          <LookupTableExtractorConfiguration configuration={this.props.configuration}
-                                             exampleMessage={this.props.exampleMessage}
-                                             onChange={this.props.onChange}
-                                             onExtractorPreviewLoad={this._onExtractorPreviewLoad} />
-        );
         break;
       default:
         console.warn(`Unsupported extractor type ${this.props.extractorType}`);

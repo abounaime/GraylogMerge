@@ -1,6 +1,9 @@
+
 import React from 'react';
 import { NavDropdown, MenuItem } from 'react-bootstrap';
 import { LinkContainer } from 'react-router-bootstrap';
+import { IfPermitted } from 'components/common';
+
 
 import StoreProvider from 'injection/StoreProvider';
 const SessionStore = StoreProvider.getStore('Session');
@@ -23,12 +26,16 @@ const UserMenu = React.createClass({
   },
   render() {
     return (
+
       <NavDropdown title={this.props.fullName} id="user-menu-dropdown">
+        <IfPermitted permissions="users:create">
         <LinkContainer to={Routes.SYSTEM.AUTHENTICATION.USERS.edit(encodeURIComponent(this.props.loginName))}>
           <MenuItem>Edit profile</MenuItem>
         </LinkContainer>
         <MenuItem divider />
+        </IfPermitted>
         <MenuItem onSelect={this.onLogoutClicked}><i className="fa fa-sign-out" /> Log out</MenuItem>
+
       </NavDropdown>
     );
   },

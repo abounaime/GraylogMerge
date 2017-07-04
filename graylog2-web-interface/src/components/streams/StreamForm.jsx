@@ -23,6 +23,7 @@ const StreamForm = React.createClass({
         title: '',
         description: '',
         remove_matches_from_default_stream: false,
+        isFavoriteStream: false
       },
     };
   },
@@ -48,6 +49,7 @@ const StreamForm = React.createClass({
       title: props.stream.title,
       description: props.stream.description,
       remove_matches_from_default_stream: props.stream.remove_matches_from_default_stream,
+      isFavoriteStream:props.stream.isFavoriteStream,
       index_set_id: defaultIndexSetId,
     };
   },
@@ -59,6 +61,7 @@ const StreamForm = React.createClass({
         description: this.state.description,
         remove_matches_from_default_stream: this.state.remove_matches_from_default_stream,
         index_set_id: this.state.index_set_id,
+        isFavoriteStream:this.state.isFavoriteStream,
       });
     this.refs.modal.close();
   },
@@ -68,6 +71,7 @@ const StreamForm = React.createClass({
     IndexSetsActions.list(false);
     this.refs.modal.open();
   },
+
 
   close() {
     this.refs.modal.close();
@@ -103,16 +107,20 @@ const StreamForm = React.createClass({
                           title={this.props.title}
                           onSubmitForm={this._onSubmit}
                           submitButtonText="Save">
-        <Input id="Title" type="text" required label="Title" name="Title"
+        <Input type="text" required label="Title" name="Title"
                placeholder="A descriptive name of the new stream"
                valueLink={this.linkState('title')} autoFocus />
-        <Input id="Description" type="text" required label="Description" name="Description"
+        <Input type="text" required label="Description" name="Description"
                placeholder="What kind of messages are routed into this stream?"
                valueLink={this.linkState('description')} />
         {indexSetSelect}
-        <Input id="RemoveFromDefaultStream" type="checkbox" label="Remove matches from 'All messages' stream" name="Remove from All messages"
+        <Input type="checkbox" label="Remove matches from 'All messages' stream" name="Remove from All messages"
                help={<span>Remove messages that match this stream from the 'All messages' stream which is assigned to every message by default.</span>}
                checkedLink={this.linkState('remove_matches_from_default_stream')} />
+
+        <Input type="checkbox" label="Favoris" name="isFavoriteStream"
+               help={<span>Favoris</span>}
+               checkedLink={this.linkState('isFavoriteStream')} />
       </BootstrapModalForm>
     );
   },
